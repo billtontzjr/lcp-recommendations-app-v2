@@ -83,21 +83,61 @@ For each spine region (cervical, thoracic, lumbar):
    - Thoracic compression fracture → T3
    - Lumbar disc → L1
 
-### UPPER EXTREMITY ANALYSIS:
-- Rotator cuff partial tear, non-op → S1
-- Rotator cuff full tear, non-op → S2
+### SHOULDER ANALYSIS:
+- Rotator cuff tendinopathy or partial tear, non-op → S1
+- Full-thickness rotator cuff tear, non-op → S2
 - Post-op rotator cuff repair → S3
 - Labral tear, non-op → S4
 - Post-op labral repair → S5
-- Shoulder replacement → S6
+- Shoulder arthroplasty (replacement) → S6
 
-### LOWER EXTREMITY ANALYSIS:
+### ELBOW ANALYSIS:
+- Elbow tendinopathy (tennis/golfer's elbow), non-op with structural damage → E1
+- Post-op elbow surgery (ulnar nerve transposition, tendon repair) → E2
+- Cubital tunnel syndrome, non-surgical → E3
+- Post-op cubital tunnel release → E4
+- Elbow fracture/dislocation, non-op → E5
+- Post-op elbow fracture ORIF → E6
+
+### WRIST/HAND ANALYSIS:
+- Wrist/hand tendinopathy or mild carpal tunnel, non-op → W1
+- Post-op tendon repair of wrist/hand → W2
+- Carpal tunnel syndrome, non-surgical → W3
+- Post-op carpal tunnel release → W4
+- Wrist fracture (distal radius, scaphoid), non-op → W5
+- Post-op wrist fracture ORIF → W6
+
+### HIP ANALYSIS:
 - Hip labral tear, non-op → H1
 - Post-op hip arthroscopy → H2
+- Hip osteoarthritis, non-op → H3
+- Hip fracture, non-op → H4
+- Post-op hip fracture ORIF → H5
+- Total hip arthroplasty → H6
+
+### KNEE ANALYSIS:
 - Meniscus tear, non-op → K1
-- Post-op knee arthroscopy → K2
+- Post-op knee arthroscopy (meniscectomy/meniscal repair) → K2
 - ACL tear, non-op → K3
 - Post-op ACL reconstruction → K4
+- Knee osteoarthritis, non-op → K5
+- Tibial plateau fracture, non-op → K6
+- Post-op tibial plateau fracture ORIF → K7
+- Total knee arthroplasty → K8
+
+### FOOT/ANKLE ANALYSIS:
+- Ankle ligament injury with structural damage (complete tear, chronic instability), non-op → F1
+- Post-op ankle ligament reconstruction → F2
+- Achilles tendon injury (tendinopathy, partial/complete tear), non-op → F3
+- Post-op Achilles tendon repair → F4
+- Ankle fracture, non-op → F5
+- Post-op ankle fracture ORIF → F6
+- Ankle osteoarthritis, non-op → F7
+- Ankle fusion (arthrodesis) → F8
+- Total ankle arthroplasty → F9
+- Foot fracture (metatarsal, calcaneus, navicular, cuboid, Lisfranc), non-op → F10
+- Post-op foot fracture ORIF → F11
+- Plantar fasciitis with structural fascia damage → F12
 
 ## Key Rules:
 1. ONLY select scenarios for STRUCTURAL injuries (herniations, tears, fractures, stenosis)

@@ -389,7 +389,156 @@ SCENARIO_S6 = {
 
 
 # =============================================================================
-# KNEE SCENARIOS (Selected - add more as needed)
+# ELBOW SCENARIOS
+# =============================================================================
+
+SCENARIO_E1 = {
+    "code": "E1",
+    "name": "Elbow Tendinopathy, Non-Operative",
+    "description": "Overuse or traumatic elbow tendinopathy managed conservatively",
+    "items": [
+        create_item("Physicians", "Orthopedic Elbow Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Elbow MRI", CPT_ELBOW_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Elbow X-ray", CPT_ELBOW_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Physical Therapy (12 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=12),
+    ]
+}
+
+SCENARIO_E2 = {
+    "code": "E2",
+    "name": "Post-Operative Elbow Surgery",
+    "description": "Elbow surgery (ulnar nerve transposition, tendon repair)",
+    "items": [
+        create_item("Physicians", "Orthopedic Elbow Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Elbow MRI", CPT_ELBOW_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Elbow X-ray", CPT_ELBOW_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Physical Therapy (18 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=18),
+    ]
+}
+
+SCENARIO_E3 = {
+    "code": "E3",
+    "name": "Cubital Tunnel Syndrome, Non-Surgical",
+    "description": "Ulnar nerve compression at the elbow managed without surgery",
+    "items": [
+        create_item("Physicians", "Orthopedic/Hand Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Durable Medical Equipment", "Night-time Elbow Splint", "L3760", "every_4_years", "recurring"),
+        create_item("Therapies", "Occupational Therapy (12 visits)", CPT_PT_TREATMENT, "every_4_years", "recurring", units=12),
+    ]
+}
+
+SCENARIO_E4 = {
+    "code": "E4",
+    "name": "Post-Operative Cubital Tunnel Release",
+    "description": "Surgical decompression of the ulnar nerve at the elbow",
+    "items": [
+        create_item("Physicians", "Orthopedic/Hand Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Therapies", "Post-Operative Occupational Therapy (18 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=18),
+    ]
+}
+
+SCENARIO_E5 = {
+    "code": "E5",
+    "name": "Elbow Fracture/Dislocation, Non-Operative",
+    "description": "Elbow fracture or dislocation managed non-operatively",
+    "items": [
+        create_item("Physicians", "Orthopedic Elbow Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Elbow MRI", CPT_ELBOW_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Elbow X-ray", CPT_ELBOW_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=18),
+    ]
+}
+
+SCENARIO_E6 = {
+    "code": "E6",
+    "name": "Post-Operative Elbow Fracture Fixation (ORIF)",
+    "description": "Elbow fracture treated with open reduction internal fixation",
+    "items": [
+        create_item("Physicians", "Orthopedic Elbow Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Elbow MRI", CPT_ELBOW_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Elbow X-ray", CPT_ELBOW_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Physical Therapy (30 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=30),
+    ]
+}
+
+
+# =============================================================================
+# WRIST/HAND SCENARIOS
+# =============================================================================
+
+SCENARIO_W1 = {
+    "code": "W1",
+    "name": "Wrist/Hand Tendinopathy or Mild Carpal Tunnel, Non-Operative",
+    "description": "Wrist or hand tendinopathy or mild carpal tunnel syndrome managed conservatively",
+    "items": [
+        create_item("Physicians", "Orthopedic or Hand Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Durable Medical Equipment", "Wrist Splint", "L3908", "every_4_years", "recurring"),
+        create_item("Therapies", "Occupational Therapy (12 visits)", CPT_PT_TREATMENT, "every_4_years", "recurring", units=12),
+    ]
+}
+
+SCENARIO_W2 = {
+    "code": "W2",
+    "name": "Post-Operative Tendon Repair of the Wrist/Hand",
+    "description": "Surgical repair of wrist/hand tendons",
+    "items": [
+        create_item("Physicians", "Hand Surgeon Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Wrist/Hand MRI", CPT_WRIST_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Wrist/Hand X-ray", CPT_WRIST_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Occupational Therapy (18 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=18),
+    ]
+}
+
+SCENARIO_W3 = {
+    "code": "W3",
+    "name": "Carpal Tunnel Syndrome, Non-Surgical",
+    "description": "Median nerve compression at the wrist managed without surgery",
+    "items": [
+        create_item("Physicians", "Hand Surgeon Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Durable Medical Equipment", "Wrist Splint", "L3908", "every_4_years", "recurring"),
+        create_item("Therapies", "Occupational Therapy (12 visits)", CPT_PT_TREATMENT, "every_4_years", "recurring", units=12),
+        create_item("Procedures/Hospitalizations/Surgery", "Carpal Tunnel Injection", "20526", "yearly", "recurring"),
+    ]
+}
+
+SCENARIO_W4 = {
+    "code": "W4",
+    "name": "Post-Operative Carpal Tunnel Release",
+    "description": "Open or endoscopic carpal tunnel release",
+    "items": [
+        create_item("Physicians", "Hand Surgeon Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Therapies", "Post-Operative Occupational Therapy (18 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=18),
+    ]
+}
+
+SCENARIO_W5 = {
+    "code": "W5",
+    "name": "Wrist Fracture, Non-Operative",
+    "description": "Distal radius fracture, scaphoid fracture, or other wrist fracture managed with immobilization",
+    "items": [
+        create_item("Physicians", "Orthopedic or Hand Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Wrist MRI", CPT_WRIST_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Wrist X-ray", CPT_WRIST_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_4_years", "recurring", units=18),
+        create_item("Durable Medical Equipment", "Wrist Splint", "L3908", "every_4_years", "recurring"),
+    ]
+}
+
+SCENARIO_W6 = {
+    "code": "W6",
+    "name": "Post-Operative Wrist Fracture Fixation (ORIF)",
+    "description": "Distal radius fracture treated with open reduction internal fixation",
+    "items": [
+        create_item("Physicians", "Orthopedic or Hand Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Wrist MRI", CPT_WRIST_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Wrist X-ray", CPT_WRIST_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Occupational Therapy (24 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=24),
+    ]
+}
+
+
+# =============================================================================
+# KNEE SCENARIOS
 # =============================================================================
 
 SCENARIO_K1 = {
@@ -400,7 +549,7 @@ SCENARIO_K1 = {
         create_item("Physicians", "Orthopedic Knee Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
         create_item("Diagnostic Testing", "Knee MRI", CPT_KNEE_MRI, "every_2_years", "recurring"),
         create_item("Diagnostic Testing", "Knee X-ray", CPT_KNEE_XRAY, "every_2_years", "recurring"),
-        create_item("Therapies", "Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_2_years", "recurring", units=18),
+        create_item("Therapies", "Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=18),
         create_item("Procedures/Hospitalizations/Surgery", "Knee Injection", "20610", "yearly", "recurring"),
         create_item("Durable Medical Equipment", "Hinged Knee Brace", "L1832", "every_4_years", "recurring"),
     ]
@@ -409,25 +558,25 @@ SCENARIO_K1 = {
 SCENARIO_K2 = {
     "code": "K2",
     "name": "Post-Operative Knee Arthroscopy",
-    "description": "Patient has undergone knee arthroscopy",
+    "description": "Patient has undergone knee arthroscopy (meniscectomy or meniscal repair)",
     "items": [
         create_item("Physicians", "Orthopedic Knee Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
         create_item("Diagnostic Testing", "Knee MRI", CPT_KNEE_MRI, "every_2_years", "recurring"),
         create_item("Diagnostic Testing", "Knee X-ray", CPT_KNEE_XRAY, "every_2_years", "recurring"),
         create_item("Therapies", "Post-Operative Physical Therapy (18 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=18),
-        create_item("Therapies", "Long-term Physical Therapy (12 visits)", CPT_PT_TREATMENT, "every_2_years", "recurring", units=12),
+        create_item("Therapies", "Long-term Physical Therapy (12 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=12),
     ]
 }
 
 SCENARIO_K3 = {
     "code": "K3",
     "name": "ACL Tear, Non-Operative",
-    "description": "ACL tear managed non-operatively",
+    "description": "ACL tear managed non-operatively with rehabilitation and bracing",
     "items": [
         create_item("Physicians", "Orthopedic Knee Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
         create_item("Diagnostic Testing", "Knee MRI", CPT_KNEE_MRI, "every_2_years", "recurring"),
         create_item("Diagnostic Testing", "Knee X-ray", CPT_KNEE_XRAY, "every_2_years", "recurring"),
-        create_item("Therapies", "Physical Therapy (24 visits)", CPT_PT_TREATMENT, "every_2_years", "recurring", units=24),
+        create_item("Therapies", "Physical Therapy (24 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=24),
         create_item("Durable Medical Equipment", "Functional ACL Brace", "L1845", "every_4_years", "recurring"),
     ]
 }
@@ -441,14 +590,68 @@ SCENARIO_K4 = {
         create_item("Diagnostic Testing", "Knee MRI", CPT_KNEE_MRI, "every_2_years", "recurring"),
         create_item("Diagnostic Testing", "Knee X-ray", CPT_KNEE_XRAY, "every_2_years", "recurring"),
         create_item("Therapies", "Post-Operative Physical Therapy (42 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=42),
-        create_item("Therapies", "Long-term Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_2_years", "recurring", units=18),
+        create_item("Therapies", "Long-term Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=18),
         create_item("Durable Medical Equipment", "Functional ACL Brace", "L1845", "every_4_years", "recurring"),
+    ]
+}
+
+SCENARIO_K5 = {
+    "code": "K5",
+    "name": "Knee Osteoarthritis, Non-Operative",
+    "description": "Post-traumatic knee osteoarthritis managed non-operatively",
+    "items": [
+        create_item("Physicians", "Orthopedic Knee Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Knee MRI", CPT_KNEE_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Knee X-ray", CPT_KNEE_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=18),
+        create_item("Procedures/Hospitalizations/Surgery", "Knee Injection", "20610", "2x_year", "recurring"),
+        create_item("Durable Medical Equipment", "Unloader Knee Brace", "L1843", "every_4_years", "recurring"),
+        create_item("Durable Medical Equipment", "Cane", "E0100", "every_5_years", "recurring"),
+    ]
+}
+
+SCENARIO_K6 = {
+    "code": "K6",
+    "name": "Tibial Plateau Fracture, Non-Operative",
+    "description": "Tibial plateau fracture managed non-operatively with protected weight-bearing",
+    "items": [
+        create_item("Physicians", "Orthopedic Knee Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Knee MRI", CPT_KNEE_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Knee X-ray", CPT_KNEE_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Physical Therapy (24 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=24),
+        create_item("Durable Medical Equipment", "Hinged Knee Brace", "L1832", "every_4_years", "recurring"),
+    ]
+}
+
+SCENARIO_K7 = {
+    "code": "K7",
+    "name": "Post-Operative Tibial Plateau Fracture Fixation (ORIF)",
+    "description": "Tibial plateau fracture treated with open reduction internal fixation",
+    "items": [
+        create_item("Physicians", "Orthopedic Knee Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Knee MRI", CPT_KNEE_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Knee X-ray", CPT_KNEE_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Physical Therapy (30 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=30),
+        create_item("Therapies", "Long-term Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=18),
+    ]
+}
+
+SCENARIO_K8 = {
+    "code": "K8",
+    "name": "Total Knee Arthroplasty (Primary)",
+    "description": "Patient has undergone primary total knee arthroplasty",
+    "items": [
+        create_item("Physicians", "Orthopedic Knee Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Knee MRI", CPT_KNEE_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Knee X-ray", CPT_KNEE_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Physical Therapy (30 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=30),
+        create_item("Therapies", "Long-term Physical Therapy (12 visits)", CPT_PT_TREATMENT, "every_4_years", "recurring", units=12),
     ]
 }
 
 
 # =============================================================================
-# HIP SCENARIOS (Selected)
+# HIP SCENARIOS
 # =============================================================================
 
 SCENARIO_H1 = {
@@ -459,7 +662,7 @@ SCENARIO_H1 = {
         create_item("Physicians", "Orthopedic Hip Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
         create_item("Diagnostic Testing", "Hip MRI", CPT_HIP_MRI, "every_2_years", "recurring"),
         create_item("Diagnostic Testing", "Hip X-ray", CPT_HIP_XRAY, "every_2_years", "recurring"),
-        create_item("Therapies", "Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_2_years", "recurring", units=18),
+        create_item("Therapies", "Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=18),
         create_item("Procedures/Hospitalizations/Surgery", "Hip Injection", "20610", "yearly", "recurring"),
     ]
 }
@@ -467,7 +670,7 @@ SCENARIO_H1 = {
 SCENARIO_H2 = {
     "code": "H2",
     "name": "Post-Operative Hip Arthroscopy",
-    "description": "Patient has undergone hip arthroscopy",
+    "description": "Patient has undergone hip arthroscopy for labral repair/debridement or FAI correction",
     "items": [
         create_item("Physicians", "Orthopedic Hip Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
         create_item("Diagnostic Testing", "Hip MRI", CPT_HIP_MRI, "every_2_years", "recurring"),
@@ -477,25 +680,246 @@ SCENARIO_H2 = {
     ]
 }
 
+SCENARIO_H3 = {
+    "code": "H3",
+    "name": "Hip Osteoarthritis, Non-Operative",
+    "description": "Post-traumatic hip osteoarthritis managed non-operatively",
+    "items": [
+        create_item("Physicians", "Orthopedic Hip Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Hip MRI", CPT_HIP_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Hip X-ray", CPT_HIP_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=18),
+        create_item("Procedures/Hospitalizations/Surgery", "Hip Injection", "20610", "yearly", "recurring"),
+        create_item("Durable Medical Equipment", "Cane", "E0100", "every_5_years", "recurring"),
+    ]
+}
+
+SCENARIO_H4 = {
+    "code": "H4",
+    "name": "Hip Fracture, Non-Operative",
+    "description": "Hip fracture managed non-operatively with protected weight-bearing",
+    "items": [
+        create_item("Physicians", "Orthopedic Hip Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Hip MRI", CPT_HIP_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Hip X-ray", CPT_HIP_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Physical Therapy (24 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=24),
+        create_item("Durable Medical Equipment", "Assistive Device", "E0100", "every_5_years", "recurring"),
+    ]
+}
+
+SCENARIO_H5 = {
+    "code": "H5",
+    "name": "Post-Operative Hip Fracture Fixation (ORIF)",
+    "description": "Hip fracture treated with open reduction internal fixation",
+    "items": [
+        create_item("Physicians", "Orthopedic Hip Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Hip MRI", CPT_HIP_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Hip X-ray", CPT_HIP_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Physical Therapy (30 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=30),
+        create_item("Therapies", "Long-term Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=18),
+    ]
+}
+
+SCENARIO_H6 = {
+    "code": "H6",
+    "name": "Total Hip Arthroplasty (Primary)",
+    "description": "Patient has undergone primary total hip arthroplasty",
+    "items": [
+        create_item("Physicians", "Orthopedic Hip Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Hip MRI", CPT_HIP_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Hip X-ray", CPT_HIP_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Physical Therapy (30 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=30),
+        create_item("Therapies", "Long-term Physical Therapy (12 visits)", CPT_PT_TREATMENT, "every_4_years", "recurring", units=12),
+    ]
+}
+
+
+# =============================================================================
+# FOOT AND ANKLE SCENARIOS
+# =============================================================================
+
+SCENARIO_F1 = {
+    "code": "F1",
+    "name": "Ankle Sprain/Ligament Injury, Non-Operative (Structural)",
+    "description": "Ankle ligament injury with structural damage (complete tear, chronic instability)",
+    "items": [
+        create_item("Physicians", "Orthopedic Foot and Ankle Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Ankle MRI", CPT_ANKLE_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Ankle X-ray", CPT_ANKLE_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=18),
+        create_item("Durable Medical Equipment", "Ankle Brace", "L1906", "every_3_years", "recurring"),
+    ]
+}
+
+SCENARIO_F2 = {
+    "code": "F2",
+    "name": "Post-Operative Ankle Ligament Reconstruction",
+    "description": "Patient has undergone ankle ligament reconstruction (Brostrom repair or anatomic reconstruction)",
+    "items": [
+        create_item("Physicians", "Orthopedic Foot and Ankle Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Ankle MRI", CPT_ANKLE_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Ankle X-ray", CPT_ANKLE_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Physical Therapy (30 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=30),
+        create_item("Therapies", "Long-term Physical Therapy (12 visits)", CPT_PT_TREATMENT, "every_4_years", "recurring", units=12),
+        create_item("Durable Medical Equipment", "Ankle Brace", "L1906", "every_4_years", "recurring"),
+    ]
+}
+
+SCENARIO_F3 = {
+    "code": "F3",
+    "name": "Achilles Tendon Injury, Non-Operative",
+    "description": "Achilles tendinopathy, partial tear, or complete rupture managed non-operatively",
+    "items": [
+        create_item("Physicians", "Orthopedic Foot and Ankle Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Ankle MRI", CPT_ANKLE_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Ankle X-ray", CPT_ANKLE_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=18),
+        create_item("Durable Medical Equipment", "Heel Lift or Orthotic", "L3000", "every_3_years", "recurring"),
+    ]
+}
+
+SCENARIO_F4 = {
+    "code": "F4",
+    "name": "Post-Operative Achilles Tendon Repair",
+    "description": "Patient has undergone surgical repair of a complete Achilles tendon rupture",
+    "items": [
+        create_item("Physicians", "Orthopedic Foot and Ankle Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Ankle MRI", CPT_ANKLE_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Ankle X-ray", CPT_ANKLE_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Physical Therapy (42 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=42),
+        create_item("Therapies", "Long-term Physical Therapy (12 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=12),
+        create_item("Durable Medical Equipment", "Heel Lift or Custom Orthotic", "L3000", "every_3_years", "recurring"),
+    ]
+}
+
+SCENARIO_F5 = {
+    "code": "F5",
+    "name": "Ankle Fracture, Non-Operative",
+    "description": "Ankle fracture managed non-operatively with immobilization",
+    "items": [
+        create_item("Physicians", "Orthopedic Foot and Ankle Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Ankle MRI", CPT_ANKLE_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Ankle X-ray", CPT_ANKLE_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=18),
+        create_item("Durable Medical Equipment", "Ankle Brace or Custom Orthotic", "L1906", "every_4_years", "recurring"),
+    ]
+}
+
+SCENARIO_F6 = {
+    "code": "F6",
+    "name": "Post-Operative Ankle Fracture Fixation (ORIF)",
+    "description": "Ankle fracture treated with open reduction internal fixation",
+    "items": [
+        create_item("Physicians", "Orthopedic Foot and Ankle Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Ankle MRI", CPT_ANKLE_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Ankle X-ray", CPT_ANKLE_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Physical Therapy (30 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=30),
+        create_item("Therapies", "Long-term Physical Therapy (12 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=12),
+    ]
+}
+
+SCENARIO_F7 = {
+    "code": "F7",
+    "name": "Ankle Osteoarthritis, Non-Operative",
+    "description": "Post-traumatic ankle osteoarthritis managed non-operatively",
+    "items": [
+        create_item("Physicians", "Orthopedic Foot and Ankle Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Ankle MRI", CPT_ANKLE_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Ankle X-ray", CPT_ANKLE_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Physical Therapy (12 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=12),
+        create_item("Procedures/Hospitalizations/Surgery", "Ankle Injection", "20605", "yearly", "recurring"),
+        create_item("Durable Medical Equipment", "Arizona Brace or Custom AFO", "L1970", "every_4_years", "recurring"),
+        create_item("Durable Medical Equipment", "Rocker-bottom Shoe Modification", "L3215", "every_3_years", "recurring"),
+    ]
+}
+
+SCENARIO_F8 = {
+    "code": "F8",
+    "name": "Ankle Fusion (Arthrodesis)",
+    "description": "Patient has undergone ankle fusion for end-stage post-traumatic ankle arthritis",
+    "items": [
+        create_item("Physicians", "Orthopedic Foot and Ankle Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Ankle MRI", CPT_ANKLE_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Ankle X-ray", CPT_ANKLE_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Physical Therapy (24 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=24),
+        create_item("Therapies", "Long-term Physical Therapy (12 visits)", CPT_PT_TREATMENT, "every_4_years", "recurring", units=12),
+        create_item("Durable Medical Equipment", "Rocker-bottom Shoe Modification", "L3215", "every_3_years", "recurring"),
+    ]
+}
+
+SCENARIO_F9 = {
+    "code": "F9",
+    "name": "Total Ankle Arthroplasty",
+    "description": "Patient has undergone total ankle arthroplasty for end-stage post-traumatic ankle arthritis",
+    "items": [
+        create_item("Physicians", "Orthopedic Foot and Ankle Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Ankle MRI", CPT_ANKLE_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Ankle X-ray", CPT_ANKLE_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Physical Therapy (30 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=30),
+        create_item("Therapies", "Long-term Physical Therapy (12 visits)", CPT_PT_TREATMENT, "every_4_years", "recurring", units=12),
+    ]
+}
+
+SCENARIO_F10 = {
+    "code": "F10",
+    "name": "Foot Fracture, Non-Operative",
+    "description": "Foot fracture (metatarsal, calcaneus, navicular, cuboid, or Lisfranc) managed non-operatively",
+    "items": [
+        create_item("Physicians", "Orthopedic Foot and Ankle Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Foot MRI", CPT_FOOT_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Foot X-ray", CPT_FOOT_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Physical Therapy (18 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=18),
+        create_item("Durable Medical Equipment", "Custom Orthotic or Arch Support", "L3000", "every_3_years", "recurring"),
+        create_item("Durable Medical Equipment", "Shoe Modification", "L3215", "every_3_years", "recurring"),
+    ]
+}
+
+SCENARIO_F11 = {
+    "code": "F11",
+    "name": "Post-Operative Foot Fracture Fixation (ORIF)",
+    "description": "Foot fracture (calcaneus, Lisfranc, or complex metatarsal) treated with ORIF",
+    "items": [
+        create_item("Physicians", "Orthopedic Foot and Ankle Specialist Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Diagnostic Testing", "Foot MRI", CPT_FOOT_MRI, "every_2_years", "recurring"),
+        create_item("Diagnostic Testing", "Foot X-ray", CPT_FOOT_XRAY, "every_2_years", "recurring"),
+        create_item("Therapies", "Post-Operative Physical Therapy (24 visits)", CPT_PT_TREATMENT, "one_time", "one_time", units=24),
+        create_item("Therapies", "Long-term Physical Therapy (12 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=12),
+        create_item("Durable Medical Equipment", "Custom Orthotic", "L3000", "every_3_years", "recurring"),
+    ]
+}
+
+SCENARIO_F12 = {
+    "code": "F12",
+    "name": "Plantar Fasciitis, Non-Operative (Structural)",
+    "description": "Plantar fasciitis with structural fascia damage requiring long-term management",
+    "items": [
+        create_item("Physicians", "Orthopedic Foot and Ankle or Podiatry Office Visit", CPT_OFFICE_VISIT, "yearly", "recurring"),
+        create_item("Therapies", "Physical Therapy (12 visits)", CPT_PT_TREATMENT, "every_3_years", "recurring", units=12),
+        create_item("Durable Medical Equipment", "Custom Orthotic or Arch Support", "L3000", "every_3_years", "recurring"),
+        create_item("Durable Medical Equipment", "Night Splint", "L4396", "every_4_years", "recurring"),
+        create_item("Procedures/Hospitalizations/Surgery", "Plantar Fascia Injection", "20550", "yearly", "recurring"),
+    ]
+}
+
 
 # =============================================================================
 # MASTER SCENARIO LOOKUP
 # =============================================================================
 
 SCENARIO_BUNDLES = {
-    # Cervical
+    # Cervical Spine (C1-C6)
     "C1": SCENARIO_C1,
     "C2": SCENARIO_C2,
     "C3": SCENARIO_C3,
     "C4": SCENARIO_C4,
     "C5": SCENARIO_C5,
     "C6": SCENARIO_C6,
-    # Thoracic
+    # Thoracic Spine (T1-T4)
     "T1": SCENARIO_T1,
     "T2": SCENARIO_T2,
     "T3": SCENARIO_T3,
     "T4": SCENARIO_T4,
-    # Lumbar
+    # Lumbar Spine (L1-L7)
     "L1": SCENARIO_L1,
     "L2": SCENARIO_L2,
     "L3": SCENARIO_L3,
@@ -503,21 +927,56 @@ SCENARIO_BUNDLES = {
     "L5": SCENARIO_L5,
     "L6": SCENARIO_L6,
     "L7": SCENARIO_L7,
-    # Shoulder
+    # Shoulder (S1-S6)
     "S1": SCENARIO_S1,
     "S2": SCENARIO_S2,
     "S3": SCENARIO_S3,
     "S4": SCENARIO_S4,
     "S5": SCENARIO_S5,
     "S6": SCENARIO_S6,
-    # Knee
+    # Elbow (E1-E6)
+    "E1": SCENARIO_E1,
+    "E2": SCENARIO_E2,
+    "E3": SCENARIO_E3,
+    "E4": SCENARIO_E4,
+    "E5": SCENARIO_E5,
+    "E6": SCENARIO_E6,
+    # Wrist/Hand (W1-W6)
+    "W1": SCENARIO_W1,
+    "W2": SCENARIO_W2,
+    "W3": SCENARIO_W3,
+    "W4": SCENARIO_W4,
+    "W5": SCENARIO_W5,
+    "W6": SCENARIO_W6,
+    # Hip (H1-H6)
+    "H1": SCENARIO_H1,
+    "H2": SCENARIO_H2,
+    "H3": SCENARIO_H3,
+    "H4": SCENARIO_H4,
+    "H5": SCENARIO_H5,
+    "H6": SCENARIO_H6,
+    # Knee (K1-K8)
     "K1": SCENARIO_K1,
     "K2": SCENARIO_K2,
     "K3": SCENARIO_K3,
     "K4": SCENARIO_K4,
-    # Hip
-    "H1": SCENARIO_H1,
-    "H2": SCENARIO_H2,
+    "K5": SCENARIO_K5,
+    "K6": SCENARIO_K6,
+    "K7": SCENARIO_K7,
+    "K8": SCENARIO_K8,
+    # Foot/Ankle (F1-F12)
+    "F1": SCENARIO_F1,
+    "F2": SCENARIO_F2,
+    "F3": SCENARIO_F3,
+    "F4": SCENARIO_F4,
+    "F5": SCENARIO_F5,
+    "F6": SCENARIO_F6,
+    "F7": SCENARIO_F7,
+    "F8": SCENARIO_F8,
+    "F9": SCENARIO_F9,
+    "F10": SCENARIO_F10,
+    "F11": SCENARIO_F11,
+    "F12": SCENARIO_F12,
 }
 
 
