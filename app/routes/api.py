@@ -30,6 +30,12 @@ from app.services.supabase_client import (
     get_documents,
     get_download_url
 )
+from app.services.custom_rules import (
+    list_all_rules,
+    add_rule,
+    update_rule,
+    deactivate_rule
+)
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -300,5 +306,122 @@ def download_document(case_id):
             'download_url': download_url,
             'file_name': doc['file_name']
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# CLINICAL RULES MANAGEMENT API
+# =============================================================================
+
+@api_bp.route('/rules', methods=['GET'])
+def get_rules():
+    """
+    List all clinical decision rules.
+
+    Query params:
+        - include_inactive: bool (default false)
+    """
+    try:
+        include_inactive = request.args.get('include_inactive', 'false').lower() == 'true'
+        rules = list_all_rules(include_inactive=include_inactive)
+        return jsonify({'rules': rules})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/rules', methods=['POST'])
+def create_rule():
+    """
+    Add a new clinical decision rule.
+
+    JSON body:
+        - category: str (required) - 'general', 'age', 'treatment_history', 'diagnosis', 'body_part'
+        - rule_name: str (required)
+        - condition_description: str (required) - When this rule applies
+        - action_description: str (required) - What to do when condition is met
+        - subcategory: str (optional) - e.g., 'cervical', 'lumbar'
+        - priority: int (optional, default 100) - Higher = applied first
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'JSON body required'}), 400
+
+        required_fields = ['category', 'rule_name', 'condition_description', 'action_description']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        rule = add_rule(
+            category=data['category'],
+            rule_name=data['rule_name'],
+            condition_description=data['condition_description'],
+            action_description=data['action_description'],
+            subcategory=data.get('subcategory'),
+            priority=data.get('priority', 100)
+        )
+
+        if rule:
+            return jsonify({'rule': rule, 'message': 'Rule created successfully'}), 201
+        else:
+            return jsonify({'error': 'Failed to create rule. Check Supabase configuration.'}), 500
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/rules/<rule_id>', methods=['PUT'])
+def modify_rule(rule_id):
+    """
+    Update an existing rule.
+
+    JSON body can include any of:
+        - rule_name, condition_description, action_description
+        - category, subcategory, priority, is_active
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'JSON body required'}), 400
+
+        # Only allow certain fields to be updated
+        allowed_fields = [
+            'rule_name', 'condition_description', 'action_description',
+            'category', 'subcategory', 'priority', 'is_active'
+        ]
+        updates = {k: v for k, v in data.items() if k in allowed_fields}
+
+        if not updates:
+            return jsonify({'error': 'No valid fields to update'}), 400
+
+        rule = update_rule(rule_id, updates)
+
+        if rule:
+            return jsonify({'rule': rule, 'message': 'Rule updated successfully'})
+        else:
+            return jsonify({'error': 'Failed to update rule'}), 500
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/rules/<rule_id>', methods=['DELETE'])
+def delete_rule(rule_id):
+    """
+    Deactivate a rule (soft delete).
+
+    The rule is not permanently deleted, just marked as inactive.
+    """
+    try:
+        success = deactivate_rule(rule_id)
+
+        if success:
+            return jsonify({'message': 'Rule deactivated successfully'})
+        else:
+            return jsonify({'error': 'Failed to deactivate rule'}), 500
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500

@@ -13,6 +13,7 @@ import os
 import json
 from anthropic import Anthropic
 from app.services.scenario_bundles import get_scenario_summary
+from app.services.custom_rules import get_rules_for_analysis
 
 
 def get_scenario_list_for_prompt() -> str:
@@ -42,8 +43,11 @@ def analyze_medical_records(medical_summary: str, patient_info: dict) -> dict:
     client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
 
     scenario_list = get_scenario_list_for_prompt()
+    custom_rules = get_rules_for_analysis()
 
     system_prompt = f"""You are a medical expert assistant helping Dr. William Tontz, MD, CLCP identify applicable clinical scenarios for Life Care Plans.
+
+{custom_rules}
 
 Your task is to analyze medical records and identify which predefined clinical scenarios apply to this patient.
 
