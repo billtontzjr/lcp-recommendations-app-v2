@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: lcp-recommendations
+    name: lcp-recommendations-v2
     env: python
     region: oregon
     plan: starter
@@ -9,6 +9,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
+      - key: ANTHROPIC_API_KEY
+        sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY
