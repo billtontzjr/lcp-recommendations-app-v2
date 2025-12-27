@@ -493,3 +493,152 @@ def get_scenario_detail(code):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# KNOWLEDGE BASE API (Document Upload & Memory)
+# =============================================================================
+
+@api_bp.route('/knowledge-base/upload', methods=['POST'])
+def upload_knowledge_base():
+    """
+    Upload a Word document to be parsed as clinical preferences.
+
+    This gives Claude "memory" of Dr. Tontz's preferences.
+    The document is parsed by Claude and the extracted rules
+    are stored for use in future analyses.
+
+    Expects multipart/form-data with:
+        - file: Word document (.docx)
+        - document_type: optional (default: 'master_preferences')
+        - import_rules: optional bool (default: true) - also add to clinical_rules
+    """
+    from app.services.knowledge_base import (
+        extract_text_from_docx,
+        parse_preferences_with_claude,
+        save_knowledge_base,
+        import_rules_from_knowledge_base
+    )
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    if not file.filename.endswith('.docx'):
+        return jsonify({'error': 'Please upload a Word document (.docx)'}), 400
+
+    # Save uploaded file temporarily
+    temp_dir = tempfile.mkdtemp()
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(temp_dir, filename)
+    file.save(file_path)
+
+    try:
+        # Extract text from document
+        current_app.logger.info(f"Extracting text from {filename}")
+        raw_text = extract_text_from_docx(file_path)
+
+        if not raw_text or len(raw_text) < 100:
+            return jsonify({'error': 'Document appears to be empty or too short'}), 400
+
+        # Parse with Claude
+        current_app.logger.info("Parsing document with Claude...")
+        parsed_content = parse_preferences_with_claude(raw_text)
+
+        if parsed_content.get('error'):
+            return jsonify({
+                'error': f"Parsing error: {parsed_content['error']}",
+                'raw_response': parsed_content.get('raw_response', '')
+            }), 400
+
+        # Save to Supabase
+        document_type = request.form.get('document_type', 'master_preferences')
+        saved = save_knowledge_base(filename, raw_text, parsed_content, document_type)
+
+        # Optionally import as clinical rules
+        import_rules = request.form.get('import_rules', 'true').lower() == 'true'
+        rules_imported = 0
+        if import_rules:
+            rules_imported = import_rules_from_knowledge_base(parsed_content)
+
+        # Count extracted rules
+        rule_counts = {
+            'global_principles': len(parsed_content.get('global_principles', [])),
+            'spine_rules': len(parsed_content.get('spine_rules', [])),
+            'upper_extremity_rules': len(parsed_content.get('upper_extremity_rules', [])),
+            'lower_extremity_rules': len(parsed_content.get('lower_extremity_rules', [])),
+            'treatment_rules': len(parsed_content.get('treatment_rules', [])),
+            'age_rules': len(parsed_content.get('age_rules', [])),
+            'imaging_rules': len(parsed_content.get('imaging_rules', []))
+        }
+        total_rules = sum(rule_counts.values())
+
+        return jsonify({
+            'success': True,
+            'message': f'Document parsed successfully! Extracted {total_rules} rules.',
+            'document_name': filename,
+            'summary': parsed_content.get('raw_summary', ''),
+            'rule_counts': rule_counts,
+            'total_rules': total_rules,
+            'rules_imported_to_clinical_rules': rules_imported,
+            'saved_to_knowledge_base': saved is not None
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Error processing knowledge base upload: {str(e)}")
+        return jsonify({'error': f'Error processing document: {str(e)}'}), 500
+    finally:
+        # Cleanup
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception:
+            pass
+
+
+@api_bp.route('/knowledge-base', methods=['GET'])
+def get_knowledge_base():
+    """
+    Get the current active knowledge base content.
+    """
+    from app.services.knowledge_base import get_active_knowledge_base
+
+    try:
+        kb = get_active_knowledge_base()
+        if not kb:
+            return jsonify({
+                'active': False,
+                'message': 'No knowledge base uploaded yet. Upload a preferences document to get started.'
+            })
+
+        return jsonify({
+            'active': True,
+            'document_name': kb.get('document_name'),
+            'document_type': kb.get('document_type'),
+            'version': kb.get('version'),
+            'created_at': kb.get('created_at'),
+            'summary': kb.get('raw_summary'),
+            'parsed_content': kb.get('parsed_content')
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/knowledge-base/history', methods=['GET'])
+def get_knowledge_base_history():
+    """
+    Get history of all knowledge base uploads.
+    """
+    from app.services.knowledge_base import get_knowledge_base_history
+
+    try:
+        history = get_knowledge_base_history()
+        return jsonify({'history': history})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
