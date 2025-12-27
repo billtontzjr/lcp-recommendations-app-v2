@@ -36,6 +36,11 @@ def create_app():
     def index():
         return render_template('index.html')
 
+    # Admin panel route
+    @app.route('/admin')
+    def admin():
+        return render_template('admin.html')
+
     return app
 
 

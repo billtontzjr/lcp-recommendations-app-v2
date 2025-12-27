@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - LCP Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+            color: white;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .header a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .header a:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .tab:hover {
+            color: #2c5282;
+        }
+
+        .tab.active {
+            background: #2c5282;
+            color: white;
+        }
+
+        .panel {
+            display: none;
+        }
+
+        .panel.active {
+            display: block;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a365d;
+        }
+
+        .card-body {
+            padding: 24px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #2c5282;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1a365d;
+        }
+
+        .btn-success {
+            background: #38a169;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #2f855a;
+        }
+
+        .btn-danger {
+            background: #e53e3e;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c53030;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #4a5568;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #2c5282;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-blue {
+            background: #ebf4ff;
+            color: #2c5282;
+        }
+
+        .badge-green {
+            background: #e6fffa;
+            color: #234e52;
+        }
+
+        .badge-gray {
+            background: #edf2f7;
+            color: #4a5568;
+        }
+
+        .status-active {
+            color: #38a169;
+        }
+
+        .status-inactive {
+            color: #a0aec0;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #a0aec0;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #e6fffa;
+            color: #234e52;
+            border: 1px solid #81e6d9;
+        }
+
+        .alert-error {
+            background: #fff5f5;
+            color: #c53030;
+            border: 1px solid #fc8181;
+        }
+
+        .search-box {
+            padding: 10px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            width: 300px;
+            font-size: 14px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a0aec0;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #4a5568;
+        }
+
+        .scenario-items {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 10px;
+        }
+
+        .scenario-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .scenario-item:last-child {
+            border-bottom: none;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #718096;
+            margin-top: 4px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #718096;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>LCP Generator - Admin Panel</h1>
+        <a href="/">Back to Generator</a>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <button class="tab active" onclick="showPanel('rules')">Clinical Rules</button>
+            <button class="tab" onclick="showPanel('scenarios')">Scenarios</button>
+            <button class="tab" onclick="showPanel('help')">Help & Guide</button>
+        </div>
+
+        <div id="alert-container"></div>
+
+        <!-- Clinical Rules Panel -->
+        <div id="rules-panel" class="panel active">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Clinical Decision Rules</h2>
+                    <button class="btn btn-primary" onclick="showAddRuleModal()">+ Add New Rule</button>
+                </div>
+                <div class="card-body">
+                    <p style="margin-bottom: 20px; color: #666;">
+                        These rules guide Claude's clinical decision-making. Higher priority rules are applied first.
+                    </p>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Rule Name</th>
+                                    <th>Category</th>
+                                    <th>Condition</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rules-table-body">
+                                <tr>
+                                    <td colspan="6" class="loading">Loading rules...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scenarios Panel -->
+        <div id="scenarios-panel" class="panel">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Clinical Scenarios</h2>
+                    <input type="text" class="search-box" placeholder="Search scenarios..." oninput="filterScenarios(this.value)">
+                </div>
+                <div class="card-body">
+                    <p style="margin-bottom: 20px; color: #666;">
+                        These scenarios define the item bundles for each clinical condition. Scenarios are identified by codes (C1, L2, K4, etc.).
+                    </p>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Body Region</th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scenarios-table-body">
+                                <tr>
+                                    <td colspan="5" class="loading">Loading scenarios...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Scenario Details</h2>
+                </div>
+                <div class="card-body">
+                    <p style="color: #666;">
+                        To modify scenario items (CPT codes, frequencies, etc.), contact your developer or edit the
+                        <code>scenario_bundles.py</code> file. The scenarios table above is for reference only.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Panel -->
+        <div id="help-panel" class="panel">
+            <div class="card">
+                <div class="card-header">
+                    <h2>How to Use the Admin Panel</h2>
+                </div>
+                <div class="card-body">
+                    <h3 style="margin-bottom: 15px; color: #2c5282;">Clinical Rules</h3>
+                    <p style="margin-bottom: 20px;">
+                        Clinical rules tell Claude how to make decisions when analyzing medical records.
+                        These are your explicit instructions that override general AI behavior.
+                    </p>
+
+                    <h4 style="margin-bottom: 10px;">Categories:</h4>
+                    <ul style="margin-bottom: 20px; margin-left: 20px;">
+                        <li><strong>general</strong> - Rules that apply to all cases</li>
+                        <li><strong>age</strong> - Age-specific rules (elderly patients, etc.)</li>
+                        <li><strong>treatment_history</strong> - Rules based on prior treatments (ESI, RFA history)</li>
+                        <li><strong>diagnosis</strong> - Diagnosis-specific rules (myelopathy, cauda equina)</li>
+                        <li><strong>body_part</strong> - Region-specific rules (cervical, lumbar, etc.)</li>
+                    </ul>
+
+                    <h4 style="margin-bottom: 10px;">Priority:</h4>
+                    <p style="margin-bottom: 20px;">
+                        Higher numbers = applied first. Use 100-150 for general guidelines,
+                        200-250 for important rules, 300+ for critical overrides.
+                    </p>
+
+                    <h3 style="margin-bottom: 15px; margin-top: 30px; color: #2c5282;">Example Rules</h3>
+
+                    <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                        <h4 style="margin-bottom: 10px;">Rule: "Cervical Herniated Disc - Conservative First"</h4>
+                        <p><strong>Category:</strong> body_part</p>
+                        <p><strong>Subcategory:</strong> cervical</p>
+                        <p><strong>Condition:</strong> Patient has cervical herniated disc without prior surgery</p>
+                        <p><strong>Action:</strong> Recommend C1 scenario (non-operative management) first.
+                        Include imaging surveillance every 2 years and annual spine specialist follow-up.
+                        Only recommend surgical consultation if 6+ months of conservative care fails.</p>
+                        <p><strong>Priority:</strong> 200</p>
+                    </div>
+
+                    <div style="background: #f8fafc; padding: 20px; border-radius: 8px;">
+                        <h4 style="margin-bottom: 10px;">Rule: "ESI Failure - No More Than 3 Series"</h4>
+                        <p><strong>Category:</strong> treatment_history</p>
+                        <p><strong>Condition:</strong> Patient has had 3 or more ESI series without sustained relief</p>
+                        <p><strong>Action:</strong> Do not recommend additional ESI. Consider surgical
+                        consultation or spinal cord stimulator evaluation instead.</p>
+                        <p><strong>Priority:</strong> 250</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Rule Modal -->
+    <div id="rule-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="rule-modal-title">Add New Rule</h3>
+                <button class="modal-close" onclick="closeModal('rule-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="rule-form">
+                    <input type="hidden" id="rule-id">
+
+                    <div class="form-group">
+                        <label for="rule-name">Rule Name *</label>
+                        <input type="text" id="rule-name" required placeholder="e.g., ESI Failure Threshold">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="rule-category">Category *</label>
+                            <select id="rule-category" required>
+                                <option value="">Select category...</option>
+                                <option value="general">General</option>
+                                <option value="age">Age-Based</option>
+                                <option value="treatment_history">Treatment History</option>
+                                <option value="diagnosis">Diagnosis-Specific</option>
+                                <option value="body_part">Body Part</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="rule-subcategory">Subcategory (optional)</label>
+                            <input type="text" id="rule-subcategory" placeholder="e.g., cervical, lumbar, elderly">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="rule-condition">When does this rule apply? *</label>
+                        <textarea id="rule-condition" required placeholder="e.g., Patient has had 3 or more ESI series without sustained benefit"></textarea>
+                        <div class="help-text">Describe the condition that triggers this rule</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="rule-action">What should Claude do? *</label>
+                        <textarea id="rule-action" required placeholder="e.g., Do not recommend additional ESI. Consider surgical consultation or alternative pain management."></textarea>
+                        <div class="help-text">Describe the action Claude should take when this rule applies</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="rule-priority">Priority (100-300)</label>
+                        <input type="number" id="rule-priority" value="150" min="1" max="500">
+                        <div class="help-text">Higher priority rules are applied first. Use 200+ for important rules.</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('rule-modal')">Cancel</button>
+                <button class="btn btn-primary" onclick="saveRule()">Save Rule</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let rules = [];
+        let scenarios = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadRules();
+            loadScenarios();
+        });
+
+        // Tab switching
+        function showPanel(panel) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`${panel}-panel`).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Alert messages
+        function showAlert(message, type = 'success') {
+            const container = document.getElementById('alert-container');
+            container.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+
+        // Modal functions
+        function showAddRuleModal() {
+            document.getElementById('rule-modal-title').textContent = 'Add New Rule';
+            document.getElementById('rule-form').reset();
+            document.getElementById('rule-id').value = '';
+            document.getElementById('rule-priority').value = '150';
+            document.getElementById('rule-modal').classList.add('show');
+        }
+
+        function showEditRuleModal(rule) {
+            document.getElementById('rule-modal-title').textContent = 'Edit Rule';
+            document.getElementById('rule-id').value = rule.id;
+            document.getElementById('rule-name').value = rule.rule_name;
+            document.getElementById('rule-category').value = rule.category;
+            document.getElementById('rule-subcategory').value = rule.subcategory || '';
+            document.getElementById('rule-condition').value = rule.condition_description;
+            document.getElementById('rule-action').value = rule.action_description;
+            document.getElementById('rule-priority').value = rule.priority;
+            document.getElementById('rule-modal').classList.add('show');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        // Load rules from API
+        async function loadRules() {
+            try {
+                const response = await fetch('/api/rules?include_inactive=true');
+                const data = await response.json();
+                rules = data.rules || [];
+                renderRulesTable();
+            } catch (error) {
+                console.error('Error loading rules:', error);
+                showAlert('Failed to load rules', 'error');
+            }
+        }
+
+        // Render rules table
+        function renderRulesTable() {
+            const tbody = document.getElementById('rules-table-body');
+
+            if (rules.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="empty-state">
+                            <h3>No rules yet</h3>
+                            <p>Click "Add New Rule" to create your first clinical rule.</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = rules.map(rule => `
+                <tr>
+                    <td><strong>${rule.rule_name}</strong></td>
+                    <td>
+                        <span class="badge badge-blue">${rule.category}</span>
+                        ${rule.subcategory ? `<span class="badge badge-gray">${rule.subcategory}</span>` : ''}
+                    </td>
+                    <td style="max-width: 300px;">${truncate(rule.condition_description, 100)}</td>
+                    <td>${rule.priority}</td>
+                    <td>
+                        <span class="${rule.is_active ? 'status-active' : 'status-inactive'}">
+                            ${rule.is_active ? '● Active' : '○ Inactive'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm" onclick='showEditRuleModal(${JSON.stringify(rule)})'>Edit</button>
+                        <button class="btn btn-sm ${rule.is_active ? 'btn-danger' : 'btn-success'}"
+                                onclick="toggleRule('${rule.id}', ${!rule.is_active})">
+                            ${rule.is_active ? 'Disable' : 'Enable'}
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Save rule (create or update)
+        async function saveRule() {
+            const id = document.getElementById('rule-id').value;
+            const data = {
+                rule_name: document.getElementById('rule-name').value,
+                category: document.getElementById('rule-category').value,
+                subcategory: document.getElementById('rule-subcategory').value || null,
+                condition_description: document.getElementById('rule-condition').value,
+                action_description: document.getElementById('rule-action').value,
+                priority: parseInt(document.getElementById('rule-priority').value)
+            };
+
+            if (!data.rule_name || !data.category || !data.condition_description || !data.action_description) {
+                showAlert('Please fill in all required fields', 'error');
+                return;
+            }
+
+            try {
+                const url = id ? `/api/rules/${id}` : '/api/rules';
+                const method = id ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    showAlert(id ? 'Rule updated successfully!' : 'Rule created successfully!');
+                    closeModal('rule-modal');
+                    loadRules();
+                } else {
+                    const error = await response.json();
+                    showAlert(error.error || 'Failed to save rule', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving rule:', error);
+                showAlert('Failed to save rule', 'error');
+            }
+        }
+
+        // Toggle rule active/inactive
+        async function toggleRule(id, activate) {
+            try {
+                const response = await fetch(`/api/rules/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_active: activate })
+                });
+
+                if (response.ok) {
+                    showAlert(`Rule ${activate ? 'enabled' : 'disabled'} successfully!`);
+                    loadRules();
+                } else {
+                    showAlert('Failed to update rule', 'error');
+                }
+            } catch (error) {
+                console.error('Error toggling rule:', error);
+                showAlert('Failed to update rule', 'error');
+            }
+        }
+
+        // Load scenarios
+        async function loadScenarios() {
+            try {
+                const response = await fetch('/api/scenarios');
+                const data = await response.json();
+                scenarios = data.scenarios || [];
+                renderScenariosTable();
+            } catch (error) {
+                console.error('Error loading scenarios:', error);
+                // Use hardcoded scenarios if API fails
+                scenarios = getHardcodedScenarios();
+                renderScenariosTable();
+            }
+        }
+
+        // Render scenarios table
+        function renderScenariosTable(filter = '') {
+            const tbody = document.getElementById('scenarios-table-body');
+            const filtered = scenarios.filter(s =>
+                !filter ||
+                s.code.toLowerCase().includes(filter.toLowerCase()) ||
+                s.name.toLowerCase().includes(filter.toLowerCase()) ||
+                (s.body_region && s.body_region.toLowerCase().includes(filter.toLowerCase()))
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="empty-state">
+                            <h3>No scenarios found</h3>
+                            <p>Try adjusting your search.</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(scenario => `
+                <tr>
+                    <td><strong>${scenario.code}</strong></td>
+                    <td>${scenario.name}</td>
+                    <td><span class="badge badge-green">${scenario.body_region || 'N/A'}</span></td>
+                    <td style="max-width: 400px;">${scenario.description || ''}</td>
+                    <td><span class="status-active">● Active</span></td>
+                </tr>
+            `).join('');
+        }
+
+        // Filter scenarios
+        function filterScenarios(value) {
+            renderScenariosTable(value);
+        }
+
+        // Helper functions
+        function truncate(str, len) {
+            if (!str) return '';
+            return str.length > len ? str.substring(0, len) + '...' : str;
+        }
+
+        // Hardcoded scenarios as fallback
+        function getHardcodedScenarios() {
+            return [
+                { code: 'C1', name: 'Cervical Herniated Disc, Non-Operative', body_region: 'Cervical Spine', description: 'Structural cervical disc herniation managed non-operatively' },
+                { code: 'C2', name: 'Cervical Radiculopathy, No Prior ESI', body_region: 'Cervical Spine', description: 'Active cervical radiculopathy within one year, no prior ESI' },
+                { code: 'C3', name: 'Cervical Radiculopathy, Prior Beneficial ESI', body_region: 'Cervical Spine', description: 'Cervical radiculopathy with prior ESI that helped' },
+                { code: 'C4', name: 'Cervical Facet Syndrome, Blocks Helped, No Prior RFA', body_region: 'Cervical Spine', description: 'Cervical facet syndrome with beneficial MBB, no prior RFA' },
+                { code: 'C5', name: 'Cervical Facet Syndrome, Prior Beneficial RFA', body_region: 'Cervical Spine', description: 'Cervical facet syndrome with prior RFA that helped' },
+                { code: 'C6', name: 'Post-Operative Cervical Fusion or Disc Replacement', body_region: 'Cervical Spine', description: 'Patient has undergone ACDF or cervical disc replacement' },
+                { code: 'L1', name: 'Lumbar Disc Herniation, Non-Operative', body_region: 'Lumbar Spine', description: 'Lumbar disc herniation managed non-operatively' },
+                { code: 'L2', name: 'Lumbar Radiculopathy, Prior Beneficial ESI', body_region: 'Lumbar Spine', description: 'Lumbar radiculopathy with prior ESI that helped' },
+                { code: 'L3', name: 'Lumbar Facet Syndrome, Blocks Helped, No Prior RFA', body_region: 'Lumbar Spine', description: 'Lumbar facet syndrome with beneficial MBB, no prior RFA' },
+                // Add more as needed...
+            ];
+        }
+
+        // Close modal on outside click
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('show');
+            }
+        }
+    </script>
+</body>
+</html>

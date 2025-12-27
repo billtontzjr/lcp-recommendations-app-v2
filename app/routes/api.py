@@ -425,3 +425,71 @@ def delete_rule(rule_id):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# SCENARIOS API (Read-only for admin panel)
+# =============================================================================
+
+@api_bp.route('/scenarios', methods=['GET'])
+def get_scenarios():
+    """
+    List all clinical scenarios.
+
+    Returns scenario codes, names, and descriptions from the scenario bundles.
+    """
+    try:
+        from app.services.scenario_bundles import SCENARIO_BUNDLES
+
+        scenarios = []
+        for code, bundle in SCENARIO_BUNDLES.items():
+            # Determine body region from code prefix
+            region_map = {
+                'C': 'Cervical Spine',
+                'T': 'Thoracic Spine',
+                'L': 'Lumbar Spine',
+                'S': 'Shoulder',
+                'E': 'Elbow',
+                'W': 'Wrist/Hand',
+                'H': 'Hip',
+                'K': 'Knee',
+                'F': 'Foot/Ankle'
+            }
+            prefix = code[0] if code else ''
+            body_region = region_map.get(prefix, 'Other')
+
+            scenarios.append({
+                'code': code,
+                'name': bundle.get('name', ''),
+                'description': bundle.get('description', ''),
+                'body_region': body_region,
+                'item_count': len(bundle.get('items', []))
+            })
+
+        # Sort by code
+        scenarios.sort(key=lambda x: (x['body_region'], x['code']))
+
+        return jsonify({'scenarios': scenarios})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/scenarios/<code>', methods=['GET'])
+def get_scenario_detail(code):
+    """
+    Get detailed information about a specific scenario.
+
+    Returns the scenario bundle including all items.
+    """
+    try:
+        from app.services.scenario_bundles import get_scenario
+
+        scenario = get_scenario(code)
+        if not scenario:
+            return jsonify({'error': 'Scenario not found'}), 404
+
+        return jsonify({'scenario': scenario})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
