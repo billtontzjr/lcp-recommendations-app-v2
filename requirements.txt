@@ -1,5 +1,6 @@
 flask>=2.3.0
 gunicorn>=21.0.0
+whitenoise>=6.6.0
 python-docx>=0.8.11
 openpyxl>=3.1.0
 supabase>=2.0.0

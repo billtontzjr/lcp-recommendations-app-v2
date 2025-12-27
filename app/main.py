@@ -6,6 +6,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, render_template
+from whitenoise import WhiteNoise
 from app.config import Config
 from app.routes.health import health_bp
 from app.routes.api import api_bp
@@ -13,10 +14,12 @@ from app.routes.api import api_bp
 
 def create_app():
     """Create and configure the Flask application."""
+    static_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
+
     app = Flask(
         __name__,
         template_folder=os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates'),
-        static_folder=os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
+        static_folder=static_folder
     )
 
     app.config.from_object(Config)
@@ -38,6 +41,9 @@ def create_app():
 
 # For gunicorn
 app = create_app()
+
+# Wrap with WhiteNoise for serving static files in production
+app.wsgi_app = WhiteNoise(app.wsgi_app, root=os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static'), prefix='static/')
 
 if __name__ == '__main__':
     # For local development only - production uses gunicorn
