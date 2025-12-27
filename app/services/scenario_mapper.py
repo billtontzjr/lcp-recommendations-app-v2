@@ -113,8 +113,8 @@ def expand_scenarios_to_items(
         if not scenario:
             continue
 
-        scenario_name = scenario.get("name", code)
-        scenario_rationale = rationales.get(code, f"Per {scenario_name} clinical scenario.")
+        # Use Claude's patient-specific rationale (no mention of internal scenario system)
+        scenario_rationale = rationales.get(code, "")
 
         for item_def in scenario.get("items", []):
             # Create unique key for deduplication
@@ -122,10 +122,7 @@ def expand_scenarios_to_items(
 
             # Skip duplicates (e.g., spine specialist visits from multiple scenarios)
             if item_key in seen_items:
-                # Update rationale to include both scenarios
-                existing = seen_items[item_key]
-                if scenario_name not in existing.get("rationale", ""):
-                    existing["rationale"] += f" Also per {scenario_name}."
+                # Keep the existing rationale (first scenario's rationale wins)
                 continue
 
             # Calculate costs

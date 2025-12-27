@@ -100,7 +100,7 @@ For each spine region (cervical, thoracic, lumbar):
 2. Sprains/strains do NOT get scenarios - they heal in 6-12 weeks
 3. Multiple scenarios can apply to the same patient (e.g., C1 + C4 for disc + facet)
 4. ONE-TIME vs RECURRING is determined by treatment history (see decision trees above)
-5. Provide patient-specific rationales referencing actual findings and dates from records
+5. Rationales must be based purely on medical record findings - NO mention of scenario codes or system
 
 ## Output Format:
 Return a JSON object with this structure:
@@ -111,15 +111,16 @@ Return a JSON object with this structure:
         {{"body_part": "Cervical Spine", "diagnosis": "Facet syndrome", "structural": true, "date_documented": "7/10/2025"}}
     ],
     "rationales": {{
-        "C1": "Surveillance of C5-6 disc herniation per 7/10/25 MRI showing moderate foraminal stenosis.",
-        "C4": "One-time RFA for cervical facet syndrome with documented benefit from 8/15/25 MBB (80% relief), no prior RFA."
+        "C1": "Annual surveillance of C5-6 disc herniation with moderate foraminal stenosis per 7/10/25 MRI.",
+        "C4": "One-time cervical RFA for facet-mediated pain with documented 80% relief from 8/15/25 medial branch blocks."
     }},
-    "summary": "52-year-old with cervical disc herniation and facet syndrome. MBB provided significant relief. Recommend disc surveillance and one-time RFA."
+    "summary": "52-year-old with cervical disc herniation and facet syndrome. MBB provided significant relief."
 }}
 
 CRITICAL:
 - Scenarios must be from the available list above
-- Each rationale MUST reference specific findings and dates from the records
+- Rationales must reference SPECIFIC findings and DATES from the medical records
+- Rationales should read naturally - DO NOT mention scenario codes (C1, C4, etc.) or "clinical scenario"
 - Be conservative - typical cases have 2-5 scenarios, NOT 10+
 """
 
