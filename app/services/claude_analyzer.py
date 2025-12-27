@@ -83,7 +83,8 @@ Return a JSON object with this structure:
     "selected_items": [
         {{
             "category": "Physicians",
-            "item": "Spine Specialist Follow-up",
+            "item": "Physician Office Visit – Spine Specialist",
+            "code": "99214",
             "frequency": "1x/year",
             "rationale": "Annual surveillance of L4-5, L5-S1 disc herniations per 7/10/25 MRI.",
             "source": "Medical Records"
@@ -91,6 +92,12 @@ Return a JSON object with this structure:
     ],
     "summary": "Brief summary of injuries and care needs"
 }}
+
+IMPORTANT:
+- The "item" field MUST match EXACTLY an item name from the Available Items list below
+- The "category" field MUST match EXACTLY a category from the Available Items list
+- Include the "code" field with the CPT code(s) from the Available Items list
+- Copy item names exactly as they appear - do not paraphrase or abbreviate
 """
 
     user_prompt = f"""## Patient Information
@@ -190,36 +197,79 @@ def match_items_to_workbook(selected_items: list, workbook_items: list) -> list:
     matched_items = []
 
     for selected in selected_items:
-        selected_category = selected.get('category', '').lower()
-        selected_item = selected.get('item', '').lower()
+        selected_category = selected.get('category', '').lower().strip()
+        selected_item = selected.get('item', '').lower().strip()
+        selected_code = str(selected.get('code', '')).strip()
 
-        # Find matching item in workbook
+        best_match = None
+        best_score = 0
+
+        # Find best matching item in workbook
         for wb_item in workbook_items:
-            wb_category = str(wb_item.get('category', '')).lower()
-            wb_item_name = str(wb_item.get('item', '')).lower()
+            wb_category = str(wb_item.get('category', '')).lower().strip()
+            wb_item_name = str(wb_item.get('item', '')).lower().strip()
+            wb_code = str(wb_item.get('code', '')).strip()
 
-            # Check for match (fuzzy matching)
-            if (selected_category in wb_category or wb_category in selected_category) and \
-               (selected_item in wb_item_name or wb_item_name in selected_item):
-                matched_item = wb_item.copy()
-                matched_item['selected'] = True
-                matched_item['rationale'] = selected.get('rationale', '')
-                matched_item['source'] = selected.get('source', 'Medical Records')
-                # Use Claude's frequency if provided
-                if selected.get('frequency'):
-                    matched_item['frequency'] = selected.get('frequency')
-                matched_items.append(matched_item)
-                break
+            score = 0
+
+            # Strategy 1: Match by CPT code (highest priority)
+            if selected_code and wb_code and selected_code in wb_code:
+                score += 100
+
+            # Strategy 2: Category match
+            if selected_category and wb_category:
+                if selected_category == wb_category:
+                    score += 50
+                elif selected_category in wb_category or wb_category in selected_category:
+                    score += 25
+
+            # Strategy 3: Item name matching
+            if selected_item and wb_item_name:
+                # Exact match
+                if selected_item == wb_item_name:
+                    score += 50
+                # Partial match - check key words
+                else:
+                    selected_words = set(selected_item.replace('-', ' ').replace('–', ' ').split())
+                    wb_words = set(wb_item_name.replace('-', ' ').replace('–', ' ').split())
+                    # Remove common words
+                    common_skip = {'the', 'a', 'an', 'of', 'for', 'with', 'and', 'or', 'to'}
+                    selected_words -= common_skip
+                    wb_words -= common_skip
+
+                    if selected_words and wb_words:
+                        overlap = len(selected_words & wb_words)
+                        if overlap >= 2:
+                            score += 30
+                        elif overlap >= 1:
+                            score += 15
+
+            if score > best_score:
+                best_score = score
+                best_match = wb_item
+
+        # Threshold for accepting a match
+        if best_match and best_score >= 40:
+            matched_item = best_match.copy()
+            matched_item['selected'] = True
+            matched_item['rationale'] = selected.get('rationale', '')
+            matched_item['source'] = selected.get('source', 'Medical Records')
+            # Use Claude's frequency if provided
+            if selected.get('frequency'):
+                matched_item['frequency'] = selected.get('frequency')
+            matched_items.append(matched_item)
         else:
-            # If no exact match found, create a new item from Claude's selection
+            # No good match found - use Claude's selection directly
+            # Include all provided fields so we have item name at minimum
+            item_name = selected.get('item', '') or selected.get('service_description', '') or 'Unspecified Item'
             matched_items.append({
                 'category': selected.get('category', 'Uncategorized'),
-                'item': selected.get('item', ''),
+                'item': item_name,
                 'subcategory': selected.get('subcategory', ''),
-                'service_description': selected.get('item', ''),
-                'code_type': '',
-                'code': '',
-                'cost': 0,
+                'service_description': item_name,
+                'code_type': selected.get('code_type', 'PFR'),
+                'code': selected.get('code', ''),
+                'cost': selected.get('cost', 0),
                 'frequency': selected.get('frequency', ''),
                 'source': selected.get('source', 'Medical Records'),
                 'rationale': selected.get('rationale', ''),
