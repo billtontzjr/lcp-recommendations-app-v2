@@ -16,9 +16,9 @@ from app.services.cost_calculator import calculate_all_costs
 from app.services.document_generator import generate_lcp_document
 from app.services.claude_analyzer import (
     analyze_medical_records,
-    extract_text_from_docx,
-    match_items_to_workbook
+    extract_text_from_docx
 )
+from app.services.scenario_mapper import scenarios_to_cost_data
 from app.services.supabase_client import (
     save_case,
     save_case_items,
@@ -86,43 +86,51 @@ def generate_lcp():
 
     try:
         if medical_summary_path:
-            # AI-POWERED MODE: Use Claude to analyze records and select items
+            # AI-POWERED MODE: Use Claude to identify scenarios, then map to items
             current_app.logger.info("AI-powered mode: Analyzing medical records with Claude")
 
-            # Parse workbook to get ALL items (not just checked ones)
+            # Parse workbook to get patient info and pricing lookups
             workbook_data = parse_workbook_all_items(workbook_path)
 
             # Extract text from medical summary
             medical_text = extract_text_from_docx(medical_summary_path)
 
-            # Use Claude to analyze and select items
+            # Phase 1: Use Claude to identify applicable scenarios
             analysis_result = analyze_medical_records(
                 medical_text,
-                workbook_data['patient_info'],
-                workbook_data['all_items']
+                workbook_data['patient_info']
             )
 
             # Check for errors in Claude response
             if analysis_result.get('error'):
                 current_app.logger.warning(f"Claude analysis warning: {analysis_result['error']}")
 
-            # Match Claude's selections to workbook items
-            selected_items = match_items_to_workbook(
-                analysis_result.get('selected_items', []),
-                workbook_data['all_items']
-            )
+            # Get scenario codes from Claude's analysis
+            scenario_codes = analysis_result.get('scenarios', [])
+            rationales = analysis_result.get('rationales', {})
 
-            if not selected_items:
+            current_app.logger.info(f"Claude identified scenarios: {scenario_codes}")
+
+            if not scenario_codes:
                 return jsonify({
-                    'error': 'No items were selected based on the medical records. '
-                             'Please ensure the medical summary contains relevant diagnoses.'
+                    'error': 'No clinical scenarios were identified from the medical records. '
+                             'Please ensure the medical summary contains structural diagnoses '
+                             '(herniations, tears, fractures, etc.). Sprains/strains do not require LCP items.'
                 }), 400
 
-            # Create workbook_data structure for cost calculation
-            workbook_data['items'] = selected_items
+            # Phase 2: Map scenarios to items with costs (deterministic)
+            cost_data = scenarios_to_cost_data(
+                scenario_codes,
+                workbook_data,
+                rationales
+            )
 
-            # Calculate costs
-            cost_data = calculate_all_costs(workbook_data)
+            # Store analysis results for potential display
+            cost_data['analysis'] = {
+                'scenarios': scenario_codes,
+                'diagnoses': analysis_result.get('diagnoses', []),
+                'summary': analysis_result.get('summary', '')
+            }
 
         else:
             # TRADITIONAL MODE: Use pre-checked items from workbook

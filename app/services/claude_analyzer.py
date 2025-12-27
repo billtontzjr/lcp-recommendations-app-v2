@@ -1,103 +1,126 @@
-"""Claude API service for medical record analysis and item selection."""
+"""
+Claude API service for medical record analysis - Phase 1.
+
+This module handles the AI-driven clinical decision phase:
+- Analyzes medical records to identify injuries/diagnoses
+- Applies decision trees to match clinical scenarios
+- Outputs scenario codes (C1, C4, L2, etc.)
+
+The scenario codes are then mapped to item bundles by scenario_mapper.py (Phase 2).
+"""
+
 import os
 import json
 from anthropic import Anthropic
-from app.config import Config
-
-# Load reference files
-REFERENCES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'references')
+from app.services.scenario_bundles import get_scenario_summary
 
 
-def load_reference_file(filename):
-    """Load a reference file from the references directory."""
-    filepath = os.path.join(REFERENCES_DIR, filename)
-    if os.path.exists(filepath):
-        with open(filepath, 'r') as f:
-            return f.read()
-    return ""
+def get_scenario_list_for_prompt() -> str:
+    """Generate scenario list for Claude prompt."""
+    scenarios = get_scenario_summary()
+    lines = []
+    for code, info in sorted(scenarios.items()):
+        lines.append(f"- **{code}**: {info['name']} - {info['description']}")
+    return "\n".join(lines)
 
 
-def get_clinical_scenarios():
-    """Load clinical scenarios reference."""
-    return load_reference_file('clinical_scenarios.md')
-
-
-def get_global_principles():
-    """Load global principles reference."""
-    return load_reference_file('global_principles.md')
-
-
-def analyze_medical_records(medical_summary: str, patient_info: dict, available_items: list) -> dict:
+def analyze_medical_records(medical_summary: str, patient_info: dict) -> dict:
     """
-    Use Claude to analyze medical records and select appropriate care items.
+    Phase 1: Analyze medical records and identify applicable scenarios.
 
     Args:
         medical_summary: Text content from the medical records document
         patient_info: Dict with patient name, DOB, life expectancy, etc.
-        available_items: List of all available items from the Master sheet
 
     Returns:
         Dict with:
-        - diagnoses: List of identified diagnoses
-        - scenarios: List of matched clinical scenarios
-        - selected_items: List of items to include with rationales
+        - scenarios: List of scenario codes (e.g., ["C1", "C4"])
+        - diagnoses: List of identified diagnoses with body parts
+        - rationales: Dict mapping scenario code to patient-specific rationale
+        - summary: Brief summary of injuries and care needs
     """
     client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
 
-    clinical_scenarios = get_clinical_scenarios()
-    global_principles = get_global_principles()
+    scenario_list = get_scenario_list_for_prompt()
 
-    # Format available items for the prompt
-    items_list = "\n".join([
-        f"- Category: {item.get('category', '')} | Item: {item.get('item', '')} | "
-        f"Subcategory: {item.get('subcategory', '')} | Code: {item.get('code', '')} | "
-        f"Frequency: {item.get('frequency', '')}"
-        for item in available_items
-    ])
+    system_prompt = f"""You are a medical expert assistant helping Dr. William Tontz, MD, CLCP identify applicable clinical scenarios for Life Care Plans.
 
-    system_prompt = f"""You are a medical expert assistant helping Dr. William Tontz, MD, CLCP create Life Care Plan recommendations.
+Your task is to analyze medical records and identify which predefined clinical scenarios apply to this patient.
 
-Your task is to analyze medical records and select appropriate care items based on documented injuries and treatments.
+## Available Clinical Scenarios:
+{scenario_list}
 
-## Clinical Scenarios Reference
-{clinical_scenarios}
+## Decision Tree for Scenario Selection:
 
-## Global Principles
-{global_principles}
+### SPINE ANALYSIS:
+For each spine region (cervical, thoracic, lumbar):
+
+1. **Is there a STRUCTURAL diagnosis?** (herniation, stenosis, fracture, facet syndrome, radiculopathy)
+   - NO structural finding → Skip this region (sprains/strains don't need LCP items)
+   - YES → Continue to step 2
+
+2. **Check for prior surgery:**
+   - Cervical fusion/ACDF/disc replacement → C6
+   - Thoracic fusion → T4
+   - Lumbar fusion → L6
+   - Lumbar discectomy → L5
+
+3. **If no surgery, check for facet/RFA history:**
+   - Facet blocks/MBB performed with benefit + NO prior RFA → One-time RFA (C4, L3)
+   - Prior RFA with benefit → Annual RFA (C5, L4)
+
+4. **If no surgery or RFA, check for radiculopathy/ESI:**
+   - Active radiculopathy + NO prior ESI → One-time ESI (C2, L7)
+   - Prior ESI with benefit → Annual ESI (C3, L2, T2)
+
+5. **If structural diagnosis but none of above:**
+   - Cervical disc/stenosis → C1
+   - Thoracic pain → T1
+   - Thoracic compression fracture → T3
+   - Lumbar disc → L1
+
+### UPPER EXTREMITY ANALYSIS:
+- Rotator cuff partial tear, non-op → S1
+- Rotator cuff full tear, non-op → S2
+- Post-op rotator cuff repair → S3
+- Labral tear, non-op → S4
+- Post-op labral repair → S5
+- Shoulder replacement → S6
+
+### LOWER EXTREMITY ANALYSIS:
+- Hip labral tear, non-op → H1
+- Post-op hip arthroscopy → H2
+- Meniscus tear, non-op → K1
+- Post-op knee arthroscopy → K2
+- ACL tear, non-op → K3
+- Post-op ACL reconstruction → K4
 
 ## Key Rules:
-1. ONLY include items for documented structural injuries (disc herniations, tears, fractures)
-2. Sprains/strains do NOT require long-term surveillance
-3. Only include treatments the patient has tried AND documented benefit from
-4. Follow the Structural Injury Surveillance Rule for spine injuries
-5. Be conservative - typically 10-25 items, NOT 75+
-6. Each item needs a patient-specific rationale referencing actual findings and dates from the records
+1. ONLY select scenarios for STRUCTURAL injuries (herniations, tears, fractures, stenosis)
+2. Sprains/strains do NOT get scenarios - they heal in 6-12 weeks
+3. Multiple scenarios can apply to the same patient (e.g., C1 + C4 for disc + facet)
+4. ONE-TIME vs RECURRING is determined by treatment history (see decision trees above)
+5. Provide patient-specific rationales referencing actual findings and dates from records
 
 ## Output Format:
 Return a JSON object with this structure:
 {{
+    "scenarios": ["C1", "C4"],
     "diagnoses": [
-        {{"body_part": "Lumbar Spine", "diagnosis": "L4-5, L5-S1 disc herniations", "structural": true, "date_documented": "7/10/2025"}}
+        {{"body_part": "Cervical Spine", "diagnosis": "C5-6 disc herniation", "structural": true, "date_documented": "7/10/2025"}},
+        {{"body_part": "Cervical Spine", "diagnosis": "Facet syndrome", "structural": true, "date_documented": "7/10/2025"}}
     ],
-    "matched_scenarios": ["L1", "L8"],
-    "selected_items": [
-        {{
-            "category": "Physicians",
-            "item": "Physician Office Visit – Spine Specialist",
-            "code": "99214",
-            "frequency": "1x/year",
-            "rationale": "Annual surveillance of L4-5, L5-S1 disc herniations per 7/10/25 MRI.",
-            "source": "Medical Records"
-        }}
-    ],
-    "summary": "Brief summary of injuries and care needs"
+    "rationales": {{
+        "C1": "Surveillance of C5-6 disc herniation per 7/10/25 MRI showing moderate foraminal stenosis.",
+        "C4": "One-time RFA for cervical facet syndrome with documented benefit from 8/15/25 MBB (80% relief), no prior RFA."
+    }},
+    "summary": "52-year-old with cervical disc herniation and facet syndrome. MBB provided significant relief. Recommend disc surveillance and one-time RFA."
 }}
 
-IMPORTANT:
-- The "item" field MUST match EXACTLY an item name from the Available Items list below
-- The "category" field MUST match EXACTLY a category from the Available Items list
-- Include the "code" field with the CPT code(s) from the Available Items list
-- Copy item names exactly as they appear - do not paraphrase or abbreviate
+CRITICAL:
+- Scenarios must be from the available list above
+- Each rationale MUST reference specific findings and dates from the records
+- Be conservative - typical cases have 2-5 scenarios, NOT 10+
 """
 
     user_prompt = f"""## Patient Information
@@ -105,22 +128,18 @@ IMPORTANT:
 - Date of Birth: {patient_info.get('date_of_birth', 'Unknown')}
 - Date of Injury: {patient_info.get('date_of_injury', 'Unknown')}
 - Life Expectancy: {patient_info.get('life_expectancy', 'Unknown')} years
-- Age Initiated: {patient_info.get('age_initiated', 'Unknown')}
+- Age at Report: {patient_info.get('age_initiated', 'Unknown')}
 
 ## Medical Records Summary
 {medical_summary}
 
-## Available Items from Master Workbook
-{items_list}
-
 Please analyze the medical records above and:
-1. Identify all documented injuries/diagnoses
-2. Classify each as structural vs non-structural
-3. Match to the appropriate clinical scenarios
-4. Select ONLY the relevant items from the available items list
-5. Provide patient-specific rationales for each selected item
+1. Identify all structural injuries by body region
+2. Apply the decision trees to determine which scenarios apply
+3. Provide patient-specific rationales for each scenario
+4. Return your analysis as a JSON object
 
-Return your analysis as a JSON object."""
+Remember: Only include scenarios for STRUCTURAL injuries. Sprains/strains get NO scenarios."""
 
     try:
         response = client.messages.create(
@@ -136,7 +155,6 @@ Return your analysis as a JSON object."""
         response_text = response.content[0].text
 
         # Try to parse JSON from the response
-        # Handle case where response might have markdown code blocks
         if "```json" in response_text:
             json_start = response_text.find("```json") + 7
             json_end = response_text.find("```", json_start)
@@ -147,24 +165,31 @@ Return your analysis as a JSON object."""
             response_text = response_text[json_start:json_end].strip()
 
         result = json.loads(response_text)
-        return result
+
+        # Validate and normalize the response
+        return {
+            "scenarios": result.get("scenarios", []),
+            "diagnoses": result.get("diagnoses", []),
+            "rationales": result.get("rationales", {}),
+            "summary": result.get("summary", ""),
+            "error": None
+        }
 
     except json.JSONDecodeError as e:
-        # If JSON parsing fails, return a structured error
         return {
             "error": f"Failed to parse Claude response: {str(e)}",
             "raw_response": response_text if 'response_text' in locals() else "No response",
+            "scenarios": [],
             "diagnoses": [],
-            "matched_scenarios": [],
-            "selected_items": [],
+            "rationales": {},
             "summary": "Analysis failed - please try again"
         }
     except Exception as e:
         return {
             "error": f"Claude API error: {str(e)}",
+            "scenarios": [],
             "diagnoses": [],
-            "matched_scenarios": [],
-            "selected_items": [],
+            "rationales": {},
             "summary": "Analysis failed - please try again"
         }
 
@@ -180,100 +205,11 @@ def extract_text_from_docx(file_path: str) -> str:
         if paragraph.text.strip():
             text_content.append(paragraph.text)
 
+    # Also extract text from tables
+    for table in doc.tables:
+        for row in table.rows:
+            row_text = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+            if row_text:
+                text_content.append(" | ".join(row_text))
+
     return "\n\n".join(text_content)
-
-
-def match_items_to_workbook(selected_items: list, workbook_items: list) -> list:
-    """
-    Match Claude's selected items to actual items in the workbook.
-
-    Args:
-        selected_items: Items selected by Claude with rationales
-        workbook_items: All items from the Master sheet
-
-    Returns:
-        List of workbook items with 'selected' flag and rationales added
-    """
-    matched_items = []
-
-    for selected in selected_items:
-        selected_category = selected.get('category', '').lower().strip()
-        selected_item = selected.get('item', '').lower().strip()
-        selected_code = str(selected.get('code', '')).strip()
-
-        best_match = None
-        best_score = 0
-
-        # Find best matching item in workbook
-        for wb_item in workbook_items:
-            wb_category = str(wb_item.get('category', '')).lower().strip()
-            wb_item_name = str(wb_item.get('item', '')).lower().strip()
-            wb_code = str(wb_item.get('code', '')).strip()
-
-            score = 0
-
-            # Strategy 1: Match by CPT code (highest priority)
-            if selected_code and wb_code and selected_code in wb_code:
-                score += 100
-
-            # Strategy 2: Category match
-            if selected_category and wb_category:
-                if selected_category == wb_category:
-                    score += 50
-                elif selected_category in wb_category or wb_category in selected_category:
-                    score += 25
-
-            # Strategy 3: Item name matching
-            if selected_item and wb_item_name:
-                # Exact match
-                if selected_item == wb_item_name:
-                    score += 50
-                # Partial match - check key words
-                else:
-                    selected_words = set(selected_item.replace('-', ' ').replace('–', ' ').split())
-                    wb_words = set(wb_item_name.replace('-', ' ').replace('–', ' ').split())
-                    # Remove common words
-                    common_skip = {'the', 'a', 'an', 'of', 'for', 'with', 'and', 'or', 'to'}
-                    selected_words -= common_skip
-                    wb_words -= common_skip
-
-                    if selected_words and wb_words:
-                        overlap = len(selected_words & wb_words)
-                        if overlap >= 2:
-                            score += 30
-                        elif overlap >= 1:
-                            score += 15
-
-            if score > best_score:
-                best_score = score
-                best_match = wb_item
-
-        # Threshold for accepting a match
-        if best_match and best_score >= 40:
-            matched_item = best_match.copy()
-            matched_item['selected'] = True
-            matched_item['rationale'] = selected.get('rationale', '')
-            matched_item['source'] = selected.get('source', 'Medical Records')
-            # Use Claude's frequency if provided
-            if selected.get('frequency'):
-                matched_item['frequency'] = selected.get('frequency')
-            matched_items.append(matched_item)
-        else:
-            # No good match found - use Claude's selection directly
-            # Include all provided fields so we have item name at minimum
-            item_name = selected.get('item', '') or selected.get('service_description', '') or 'Unspecified Item'
-            matched_items.append({
-                'category': selected.get('category', 'Uncategorized'),
-                'item': item_name,
-                'subcategory': selected.get('subcategory', ''),
-                'service_description': item_name,
-                'code_type': selected.get('code_type', 'PFR'),
-                'code': selected.get('code', ''),
-                'cost': selected.get('cost', 0),
-                'frequency': selected.get('frequency', ''),
-                'source': selected.get('source', 'Medical Records'),
-                'rationale': selected.get('rationale', ''),
-                'selected': True
-            })
-
-    return matched_items
