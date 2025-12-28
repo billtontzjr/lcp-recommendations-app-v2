@@ -246,15 +246,21 @@ def expand_provider_items(
     apc_lookup: dict,
     patient_info: dict,
     seen_items: dict
-) -> list:
+) -> tuple:
     """
     Expand provider-recommended items into the standard item format.
 
     These are items directly recommended by treating providers with their
     own frequencies and rationales citing the provider.
+
+    Returns:
+        Tuple of (items_list, suggested_rows_list)
+        - items_list: Items that can be costed (found in workbook or estimated)
+        - suggested_rows_list: Items with CPT codes not found in workbook (suggested new rows)
     """
     geo_multiplier = float(patient_info.get("geographic_multiplier", 1.0) or 1.0)
     items = []
+    suggested_rows = []
 
     for provider_item in provider_items:
         item_name = provider_item.get("item", "")
@@ -262,28 +268,63 @@ def expand_provider_items(
         provider_name = provider_item.get("provider_name", "Treating Provider")
         rationale = provider_item.get("rationale", "")
         body_part = provider_item.get("body_part", "")
+        suggested_cpt = provider_item.get("suggested_cpt", "")
+        suggested_category = provider_item.get("suggested_category", "")
 
         # Parse frequency
         internal_freq, display_freq = parse_provider_frequency(frequency_str)
 
-        # Determine category from body part
-        category = "Diagnostic Testing/Assessment"
-        if body_part:
-            if "cervical" in body_part.lower() or "thoracic" in body_part.lower() or "lumbar" in body_part.lower() or "spine" in body_part.lower():
-                category = "Diagnostic Testing/Assessment"
-            elif "shoulder" in body_part.lower() or "elbow" in body_part.lower() or "wrist" in body_part.lower() or "hand" in body_part.lower():
-                category = "Diagnostic Testing/Assessment"
-            elif "hip" in body_part.lower() or "knee" in body_part.lower() or "ankle" in body_part.lower() or "foot" in body_part.lower():
-                category = "Diagnostic Testing/Assessment"
+        # Determine category - use Claude's suggestion or derive from body part
+        category = suggested_category or "Diagnostic Testing/Assessment"
+        if not suggested_category and body_part:
+            # Default categorization based on body part
+            pass  # Keep default category
 
         # Create unique key for deduplication
         item_key = f"{category}|{item_name}"
         if item_key in seen_items:
             continue
 
-        # Try to estimate cost (use a default if not found)
-        # For provider items, we don't have CPT codes, so use an estimated cost
-        unit_cost = 500.0  # Default estimate for provider-recommended items
+        # Try to look up the suggested CPT code in the workbook
+        unit_cost = 0.0
+        found_in_workbook = False
+        code_type = "PFR"
+
+        if suggested_cpt:
+            # First try PFR lookup
+            pfr_price = pfr_lookup.get(str(suggested_cpt).strip(), 0.0)
+            if pfr_price > 0:
+                unit_cost = pfr_price
+                found_in_workbook = True
+                code_type = "PFR"
+            else:
+                # Try APC lookup
+                apc_price = apc_lookup.get(str(suggested_cpt).strip(), 0.0)
+                if apc_price > 0:
+                    unit_cost = apc_price * geo_multiplier
+                    found_in_workbook = True
+                    code_type = "APC"
+
+        # If CPT not found in workbook, this is a suggested new row
+        if suggested_cpt and not found_in_workbook:
+            suggested_row = {
+                "item": item_name,
+                "suggested_cpt": suggested_cpt,
+                "suggested_category": category,
+                "frequency": display_freq,
+                "provider_name": provider_name,
+                "body_part": body_part,
+                "rationale": rationale,
+                "message": f"CPT {suggested_cpt} not found in workbook. Consider adding this row to your Master Workbook."
+            }
+            suggested_rows.append(suggested_row)
+
+            # Still create the item with an estimated cost
+            unit_cost = 500.0  # Default estimate
+
+        elif not suggested_cpt:
+            # No CPT suggested, use default estimate
+            unit_cost = 500.0
 
         # Determine if one-time or recurring
         is_one_time = internal_freq == "one_time"
@@ -301,8 +342,8 @@ def expand_provider_items(
             "item": item_name,
             "subcategory": body_part,
             "service_description": item_name,
-            "code_type": "Provider Recommendation",
-            "code": "N/A",
+            "code_type": code_type if found_in_workbook else "Provider Recommendation",
+            "code": suggested_cpt if suggested_cpt else "N/A",
             "cost": round(unit_cost, 2),
             "frequency": display_freq,
             "source": f"Treating Provider: {provider_name}",
@@ -312,12 +353,14 @@ def expand_provider_items(
             "one_time_cost": round(one_time_cost, 2),
             "scenario_code": "PROVIDER",
             "provider_name": provider_name,
+            "found_in_workbook": found_in_workbook,
+            "suggested_cpt": suggested_cpt,
         }
 
         seen_items[item_key] = item
         items.append(item)
 
-    return items
+    return items, suggested_rows
 
 
 def scenarios_to_cost_data(
@@ -336,7 +379,9 @@ def scenarios_to_cost_data(
         provider_items: Optional list of provider-recommended items from Claude
 
     Returns:
-        Cost data structure ready for document generation
+        Cost data structure ready for document generation, including:
+        - items: All costed items
+        - suggested_rows: Items with CPT codes not found in workbook
     """
     pfr_lookup = workbook_data.get("pfr_lookup", {})
     apc_lookup = workbook_data.get("apc_lookup", {})
@@ -344,6 +389,7 @@ def scenarios_to_cost_data(
 
     # Track seen items to avoid duplicates
     seen_items = {}
+    suggested_rows = []
 
     # First expand scenario-based items
     items = expand_scenarios_to_items(
@@ -361,7 +407,7 @@ def scenarios_to_cost_data(
 
     # Then add provider-recommended items (avoiding duplicates)
     if provider_items:
-        provider_expanded = expand_provider_items(
+        provider_expanded, provider_suggested = expand_provider_items(
             provider_items,
             pfr_lookup,
             apc_lookup,
@@ -369,5 +415,9 @@ def scenarios_to_cost_data(
             seen_items
         )
         items.extend(provider_expanded)
+        suggested_rows.extend(provider_suggested)
 
-    return calculate_totals(items, patient_info)
+    result = calculate_totals(items, patient_info)
+    result["suggested_rows"] = suggested_rows
+
+    return result

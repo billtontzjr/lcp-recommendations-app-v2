@@ -207,6 +207,12 @@ def generate_lcp_document(patient_info, cost_data, output_path):
         add_new_page(doc)
         add_section_page(doc, patient_info, category, data, cost_data['totals'])
 
+    # Add Suggested New Rows page if there are any
+    suggested_rows = cost_data.get('suggested_rows', [])
+    if suggested_rows:
+        add_new_page(doc)
+        add_suggested_rows_page(doc, suggested_rows)
+
     doc.save(output_path)
     return output_path
 
@@ -511,3 +517,72 @@ def add_section_page(doc, patient_info, category, category_data, totals):
     format_cell_text(sources_table.rows[1].cells[0], sources_text, Pt(10))
 
     set_bold_borders(sources_table)
+
+
+def add_suggested_rows_page(doc, suggested_rows):
+    """
+    Add a page showing items that need to be added to the Master Workbook.
+
+    These are provider-recommended items where the CPT code was not found
+    in the workbook's pricing sheets.
+    """
+    # Header
+    header = doc.add_paragraph()
+    header.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = header.add_run('SUGGESTED NEW WORKBOOK ROWS')
+    run.font.name = FONT_NAME
+    run.font.size = Pt(14)
+    run.font.bold = True
+
+    doc.add_paragraph()
+
+    # Explanation
+    explanation = doc.add_paragraph()
+    run = explanation.add_run(
+        'The following items were recommended by treating providers but the suggested CPT codes '
+        'were not found in your Master Workbook. Consider adding these rows to your workbook '
+        'for accurate pricing in future reports.'
+    )
+    run.font.name = FONT_NAME
+    run.font.size = Pt(10)
+    run.font.italic = True
+
+    doc.add_paragraph()
+
+    # Create table for suggested rows
+    num_rows = 1 + len(suggested_rows)  # header + data rows
+    table = doc.add_table(rows=num_rows, cols=5)
+    table.style = 'Table Grid'
+
+    # Column widths
+    col_widths = [Inches(2.5), Inches(1.2), Inches(1.5), Inches(1.5), Inches(1.5)]
+    for row in table.rows:
+        for i, width in enumerate(col_widths):
+            row.cells[i].width = width
+
+    # Row 0: Headers
+    headers = ['Item', 'Suggested CPT', 'Category', 'Frequency', 'Provider']
+    for i, header_text in enumerate(headers):
+        format_cell_text(table.rows[0].cells[i], header_text, Pt(10), bold=True, center=True, gray=True)
+
+    # Data rows
+    for row_idx, suggested in enumerate(suggested_rows, start=1):
+        format_cell_text(table.rows[row_idx].cells[0], suggested.get('item', ''), Pt(10))
+        format_cell_text(table.rows[row_idx].cells[1], suggested.get('suggested_cpt', ''), Pt(10), center=True)
+        format_cell_text(table.rows[row_idx].cells[2], suggested.get('suggested_category', ''), Pt(10))
+        format_cell_text(table.rows[row_idx].cells[3], suggested.get('frequency', ''), Pt(10), center=True)
+        format_cell_text(table.rows[row_idx].cells[4], suggested.get('provider_name', ''), Pt(10))
+
+    set_bold_borders(table)
+
+    doc.add_paragraph()
+
+    # Note about estimated costs
+    note = doc.add_paragraph()
+    run = note.add_run(
+        'Note: Items listed above have been included in the cost calculations using an estimated cost of $500. '
+        'For more accurate pricing, add these CPT codes to your Master Workbook and regenerate the report.'
+    )
+    run.font.name = FONT_NAME
+    run.font.size = Pt(9)
+    run.font.italic = True

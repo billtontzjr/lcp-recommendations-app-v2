@@ -158,10 +158,48 @@ If treating provider recommendations are included, you MUST:
 2. Identify the provider's name and credentials
 3. Quote the provider's recommendation verbatim when possible
 4. Create provider_items for any recommendation that doesn't fit into a standard scenario
+5. Suggest the most appropriate CPT code for each provider-recommended item
 
 Provider recommendations should be cited in rationales like:
 - "Dr. Smith recommended MRI of the cervical spine every 2 years for the duration of life expectancy."
 - "Per Dr. Johnson's 7/15/25 recommendations, the patient will require annual EMG/NCS studies."
+
+## Common CPT Codes Reference (for provider items):
+OFFICE/OUTPATIENT VISITS:
+- 99213: Office visit, established patient, low complexity
+- 99214: Office visit, established patient, moderate complexity
+- 99215: Office visit, established patient, high complexity
+- 99203: Office visit, new patient, low complexity
+- 99204: Office visit, new patient, moderate complexity
+- 99205: Office visit, new patient, high complexity
+
+IMAGING:
+- 72141: MRI cervical spine without contrast
+- 72146: MRI thoracic spine without contrast
+- 72148: MRI lumbar spine without contrast
+- 73221: MRI shoulder without contrast
+- 73721: MRI hip without contrast
+- 73721: MRI knee without contrast
+- 72170: X-ray pelvis
+- 73030: X-ray shoulder
+- 73560: X-ray knee
+
+DIAGNOSTIC TESTING:
+- 95885: EMG/NCS limited study
+- 95886: EMG/NCS complete study
+- 95910: Nerve conduction studies, 7-8 studies
+- 95911: Nerve conduction studies, 9-10 studies
+
+SPECIALTY CONSULTATIONS:
+- 99243: Office consultation, low complexity
+- 99244: Office consultation, moderate complexity
+- 99245: Office consultation, high complexity
+
+THERAPY:
+- 97110: Therapeutic exercises
+- 97140: Manual therapy
+- 97530: Therapeutic activities
+- 97542: Wheelchair management training
 
 ## Output Format:
 Return a JSON object with this structure:
@@ -182,7 +220,19 @@ Return a JSON object with this structure:
             "provider_name": "Dr. John Smith",
             "provider_quote": "The patient will require MRI of the cervical spine every 2 years to monitor disc progression.",
             "body_part": "Cervical Spine",
+            "suggested_cpt": "72141",
+            "suggested_category": "Diagnostic Testing/Assessment",
             "rationale": "Dr. John Smith recommended MRI of the cervical spine every 2 years for the duration of life expectancy to monitor disc progression."
+        }},
+        {{
+            "item": "Otolaryngology Follow-up",
+            "frequency": "Yearly",
+            "provider_name": "Dr. Jane Doe",
+            "provider_quote": "Annual ENT follow-up recommended for ongoing management.",
+            "body_part": "Head/Neck",
+            "suggested_cpt": "99214",
+            "suggested_category": "Physician/Nurse Evaluations",
+            "rationale": "Dr. Jane Doe recommended annual otolaryngology follow-up for ongoing management."
         }}
     ],
     "summary": "52-year-old with cervical disc herniation and facet syndrome. MBB provided significant relief."
