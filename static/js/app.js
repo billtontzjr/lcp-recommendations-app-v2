@@ -6,6 +6,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const summaryDropZone = document.getElementById('summaryDropZone');
     const summaryFile = document.getElementById('summaryFile');
     const summaryFileName = document.getElementById('summaryFileName');
+    const providerDropZone = document.getElementById('providerDropZone');
+    const providerFile = document.getElementById('providerFile');
+    const providerFileName = document.getElementById('providerFileName');
     const previewBtn = document.getElementById('previewBtn');
     const generateBtn = document.getElementById('generateBtn');
     const previewSection = document.getElementById('previewSection');
@@ -17,10 +20,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Drop zone handlers for workbook
     setupDropZone(workbookDropZone, workbookFile, workbookFileName, ['xlsx', 'xlsm']);
     setupDropZone(summaryDropZone, summaryFile, summaryFileName, ['docx']);
+    setupDropZone(providerDropZone, providerFile, providerFileName, ['docx']);
 
     // Click to select file
     workbookDropZone.addEventListener('click', () => workbookFile.click());
     summaryDropZone.addEventListener('click', () => summaryFile.click());
+    providerDropZone.addEventListener('click', () => providerFile.click());
 
     // File input change handlers
     workbookFile.addEventListener('change', function() {
@@ -30,6 +35,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     summaryFile.addEventListener('change', function() {
         updateFileName(this, summaryFileName, summaryDropZone);
+    });
+
+    providerFile.addEventListener('change', function() {
+        updateFileName(this, providerFileName, providerDropZone);
     });
 
     // Preview button
@@ -74,7 +83,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Update loading message based on AI mode
         const loadingText = loadingSection.querySelector('p');
-        if (summaryFile.files[0]) {
+        if (summaryFile.files[0] || providerFile.files[0]) {
             loadingText.textContent = 'Analyzing medical records with AI and generating recommendations...';
         } else {
             loadingText.textContent = 'Generating LCP Recommendations...';
@@ -85,6 +94,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (summaryFile.files[0]) {
             formData.append('medical_summary', summaryFile.files[0]);
+        }
+
+        if (providerFile.files[0]) {
+            formData.append('provider_recommendations', providerFile.files[0]);
         }
 
         try {
@@ -132,8 +145,10 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadForm.reset();
         workbookFileName.textContent = '';
         summaryFileName.textContent = '';
+        providerFileName.textContent = '';
         workbookDropZone.classList.remove('has-file');
         summaryDropZone.classList.remove('has-file');
+        providerDropZone.classList.remove('has-file');
         hideAllSections();
         updateButtons();
     });

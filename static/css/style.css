@@ -79,6 +79,22 @@ main {
     padding: 25px 20px;
 }
 
+.upload-box.tertiary {
+    padding: 25px 20px;
+    border-style: dotted;
+}
+
+.upload-box.tertiary:hover {
+    border-color: #805ad5;
+    background-color: #faf5ff;
+}
+
+.upload-box.tertiary.has-file {
+    border-color: #805ad5;
+    background-color: #faf5ff;
+    border-style: solid;
+}
+
 .upload-icon {
     font-size: 2.5rem;
     margin-bottom: 10px;

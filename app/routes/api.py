@@ -55,11 +55,13 @@ def generate_lcp():
     Expects multipart/form-data with:
         - file: Master Workbook (.xlsm/.xlsx)
         - medical_summary: Optional medical summary (.docx)
+        - provider_recommendations: Optional treating provider recommendations (.docx)
 
-    If medical_summary is provided, uses Claude AI to analyze records
-    and automatically select appropriate items based on clinical scenarios.
+    If medical_summary or provider_recommendations is provided, uses Claude AI
+    to analyze records and automatically select appropriate items based on
+    clinical scenarios and provider recommendations.
 
-    If no medical_summary, uses pre-checked items from workbook.
+    If no documents provided, uses pre-checked items from workbook.
 
     Returns:
         The generated Word document as a download
@@ -90,51 +92,73 @@ def generate_lcp():
             medical_summary_path = os.path.join(temp_dir, summary_filename)
             summary_file.save(medical_summary_path)
 
+    # Check for provider recommendations file
+    provider_recommendations_path = None
+    if 'provider_recommendations' in request.files:
+        provider_file = request.files['provider_recommendations']
+        if provider_file.filename and provider_file.filename.endswith('.docx'):
+            provider_filename = secure_filename(provider_file.filename)
+            provider_recommendations_path = os.path.join(temp_dir, provider_filename)
+            provider_file.save(provider_recommendations_path)
+
     try:
-        if medical_summary_path:
+        if medical_summary_path or provider_recommendations_path:
             # AI-POWERED MODE: Use Claude to identify scenarios, then map to items
             current_app.logger.info("AI-powered mode: Analyzing medical records with Claude")
 
             # Parse workbook to get patient info and pricing lookups
             workbook_data = parse_workbook_all_items(workbook_path)
 
-            # Extract text from medical summary
-            medical_text = extract_text_from_docx(medical_summary_path)
+            # Extract text from medical summary (if provided)
+            medical_text = ""
+            if medical_summary_path:
+                medical_text = extract_text_from_docx(medical_summary_path)
+
+            # Extract text from provider recommendations (if provided)
+            provider_text = ""
+            if provider_recommendations_path:
+                provider_text = extract_text_from_docx(provider_recommendations_path)
+                current_app.logger.info("Provider recommendations document uploaded")
 
             # Phase 1: Use Claude to identify applicable scenarios
             analysis_result = analyze_medical_records(
                 medical_text,
-                workbook_data['patient_info']
+                workbook_data['patient_info'],
+                provider_recommendations=provider_text
             )
 
             # Check for errors in Claude response
             if analysis_result.get('error'):
                 current_app.logger.warning(f"Claude analysis warning: {analysis_result['error']}")
 
-            # Get scenario codes from Claude's analysis
+            # Get scenario codes and provider items from Claude's analysis
             scenario_codes = analysis_result.get('scenarios', [])
             rationales = analysis_result.get('rationales', {})
+            provider_items = analysis_result.get('provider_items', [])
 
             current_app.logger.info(f"Claude identified scenarios: {scenario_codes}")
+            current_app.logger.info(f"Claude identified {len(provider_items)} provider-recommended items")
 
-            if not scenario_codes:
+            if not scenario_codes and not provider_items:
                 return jsonify({
-                    'error': 'No clinical scenarios were identified from the medical records. '
+                    'error': 'No clinical scenarios or provider recommendations were identified. '
                              'Please ensure the medical summary contains structural diagnoses '
-                             '(herniations, tears, fractures, etc.). Sprains/strains do not require LCP items.'
+                             '(herniations, tears, fractures, etc.) or upload treating provider recommendations.'
                 }), 400
 
             # Phase 2: Map scenarios to items with costs (deterministic)
             cost_data = scenarios_to_cost_data(
                 scenario_codes,
                 workbook_data,
-                rationales
+                rationales,
+                provider_items=provider_items
             )
 
             # Store analysis results for potential display
             cost_data['analysis'] = {
                 'scenarios': scenario_codes,
                 'diagnoses': analysis_result.get('diagnoses', []),
+                'provider_items': provider_items,
                 'summary': analysis_result.get('summary', '')
             }
 
@@ -201,6 +225,8 @@ def generate_lcp():
                 os.remove(workbook_path)
             if medical_summary_path and os.path.exists(medical_summary_path):
                 os.remove(medical_summary_path)
+            if provider_recommendations_path and os.path.exists(provider_recommendations_path):
+                os.remove(provider_recommendations_path)
         except Exception:
             pass
 

@@ -210,10 +210,121 @@ def calculate_totals(items: list, patient_info: dict) -> dict:
     }
 
 
+def parse_provider_frequency(frequency_str: str) -> tuple:
+    """
+    Parse provider-stated frequency into internal format and display format.
+
+    Returns (internal_frequency, display_frequency)
+    """
+    freq_lower = frequency_str.lower().strip()
+
+    # Common frequency mappings
+    if "every 2 year" in freq_lower or "every two year" in freq_lower or "biennial" in freq_lower:
+        return "every_2_years", "Every 2 Years"
+    elif "every 3 year" in freq_lower or "every three year" in freq_lower:
+        return "every_3_years", "Every 3 Years"
+    elif "every 4 year" in freq_lower or "every four year" in freq_lower:
+        return "every_4_years", "Every 4 Years"
+    elif "every 5 year" in freq_lower or "every five year" in freq_lower:
+        return "every_5_years", "Every 5 Years"
+    elif "twice" in freq_lower or "2x" in freq_lower or "two times" in freq_lower:
+        return "2x_year", "2 Times Per Year"
+    elif "three times" in freq_lower or "3x" in freq_lower:
+        return "3x_year", "3 Times Per Year"
+    elif "annual" in freq_lower or "yearly" in freq_lower or "per year" in freq_lower or "each year" in freq_lower:
+        return "yearly", "Yearly"
+    elif "one time" in freq_lower or "once" in freq_lower or "one-time" in freq_lower:
+        return "one_time", "One Time"
+    else:
+        # Use original as display, default to yearly for calculation
+        return "yearly", frequency_str
+
+
+def expand_provider_items(
+    provider_items: list,
+    pfr_lookup: dict,
+    apc_lookup: dict,
+    patient_info: dict,
+    seen_items: dict
+) -> list:
+    """
+    Expand provider-recommended items into the standard item format.
+
+    These are items directly recommended by treating providers with their
+    own frequencies and rationales citing the provider.
+    """
+    geo_multiplier = float(patient_info.get("geographic_multiplier", 1.0) or 1.0)
+    items = []
+
+    for provider_item in provider_items:
+        item_name = provider_item.get("item", "")
+        frequency_str = provider_item.get("frequency", "Yearly")
+        provider_name = provider_item.get("provider_name", "Treating Provider")
+        rationale = provider_item.get("rationale", "")
+        body_part = provider_item.get("body_part", "")
+
+        # Parse frequency
+        internal_freq, display_freq = parse_provider_frequency(frequency_str)
+
+        # Determine category from body part
+        category = "Diagnostic Testing/Assessment"
+        if body_part:
+            if "cervical" in body_part.lower() or "thoracic" in body_part.lower() or "lumbar" in body_part.lower() or "spine" in body_part.lower():
+                category = "Diagnostic Testing/Assessment"
+            elif "shoulder" in body_part.lower() or "elbow" in body_part.lower() or "wrist" in body_part.lower() or "hand" in body_part.lower():
+                category = "Diagnostic Testing/Assessment"
+            elif "hip" in body_part.lower() or "knee" in body_part.lower() or "ankle" in body_part.lower() or "foot" in body_part.lower():
+                category = "Diagnostic Testing/Assessment"
+
+        # Create unique key for deduplication
+        item_key = f"{category}|{item_name}"
+        if item_key in seen_items:
+            continue
+
+        # Try to estimate cost (use a default if not found)
+        # For provider items, we don't have CPT codes, so use an estimated cost
+        unit_cost = 500.0  # Default estimate for provider-recommended items
+
+        # Determine if one-time or recurring
+        is_one_time = internal_freq == "one_time"
+
+        if is_one_time:
+            annual_cost = 0.0
+            one_time_cost = unit_cost
+        else:
+            multiplier = FREQUENCY_MULTIPLIERS.get(internal_freq, 1.0)
+            annual_cost = unit_cost * multiplier
+            one_time_cost = 0.0
+
+        item = {
+            "category": category,
+            "item": item_name,
+            "subcategory": body_part,
+            "service_description": item_name,
+            "code_type": "Provider Recommendation",
+            "code": "N/A",
+            "cost": round(unit_cost, 2),
+            "frequency": display_freq,
+            "source": f"Treating Provider: {provider_name}",
+            "rationale": rationale,
+            "unit_cost": round(unit_cost, 2),
+            "annual_cost": round(annual_cost, 2),
+            "one_time_cost": round(one_time_cost, 2),
+            "scenario_code": "PROVIDER",
+            "provider_name": provider_name,
+        }
+
+        seen_items[item_key] = item
+        items.append(item)
+
+    return items
+
+
 def scenarios_to_cost_data(
     scenario_codes: list,
     workbook_data: dict,
-    rationales: dict = None
+    rationales: dict = None,
+    provider_items: list = None
 ) -> dict:
     """
     Main entry point: Convert scenarios to full cost data structure.
@@ -222,16 +333,41 @@ def scenarios_to_cost_data(
         scenario_codes: List of scenario codes from Claude analysis
         workbook_data: Parsed workbook with patient_info, pfr_lookup, apc_lookup
         rationales: Optional scenario-specific rationales from Claude
+        provider_items: Optional list of provider-recommended items from Claude
 
     Returns:
         Cost data structure ready for document generation
     """
+    pfr_lookup = workbook_data.get("pfr_lookup", {})
+    apc_lookup = workbook_data.get("apc_lookup", {})
+    patient_info = workbook_data.get("patient_info", {})
+
+    # Track seen items to avoid duplicates
+    seen_items = {}
+
+    # First expand scenario-based items
     items = expand_scenarios_to_items(
         scenario_codes,
-        workbook_data.get("pfr_lookup", {}),
-        workbook_data.get("apc_lookup", {}),
-        workbook_data.get("patient_info", {}),
+        pfr_lookup,
+        apc_lookup,
+        patient_info,
         rationales
     )
 
-    return calculate_totals(items, workbook_data.get("patient_info", {}))
+    # Track seen items from scenarios
+    for item in items:
+        item_key = f"{item['category']}|{item['item']}"
+        seen_items[item_key] = item
+
+    # Then add provider-recommended items (avoiding duplicates)
+    if provider_items:
+        provider_expanded = expand_provider_items(
+            provider_items,
+            pfr_lookup,
+            apc_lookup,
+            patient_info,
+            seen_items
+        )
+        items.extend(provider_expanded)
+
+    return calculate_totals(items, patient_info)

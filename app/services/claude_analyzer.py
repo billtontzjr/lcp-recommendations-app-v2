@@ -26,19 +26,21 @@ def get_scenario_list_for_prompt() -> str:
     return "\n".join(lines)
 
 
-def analyze_medical_records(medical_summary: str, patient_info: dict) -> dict:
+def analyze_medical_records(medical_summary: str, patient_info: dict, provider_recommendations: str = "") -> dict:
     """
     Phase 1: Analyze medical records and identify applicable scenarios.
 
     Args:
         medical_summary: Text content from the medical records document
         patient_info: Dict with patient name, DOB, life expectancy, etc.
+        provider_recommendations: Optional text from treating provider recommendations document
 
     Returns:
         Dict with:
         - scenarios: List of scenario codes (e.g., ["C1", "C4"])
         - diagnoses: List of identified diagnoses with body parts
         - rationales: Dict mapping scenario code to patient-specific rationale
+        - provider_items: List of items directly recommended by treating providers
         - summary: Brief summary of injuries and care needs
     """
     client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
@@ -150,6 +152,17 @@ For each spine region (cervical, thoracic, lumbar):
 4. ONE-TIME vs RECURRING is determined by treatment history (see decision trees above)
 5. Rationales must be based purely on medical record findings - NO mention of scenario codes or system
 
+## Treating Provider Recommendations:
+If treating provider recommendations are included, you MUST:
+1. Extract SPECIFIC recommendations with exact frequencies stated by the provider
+2. Identify the provider's name and credentials
+3. Quote the provider's recommendation verbatim when possible
+4. Create provider_items for any recommendation that doesn't fit into a standard scenario
+
+Provider recommendations should be cited in rationales like:
+- "Dr. Smith recommended MRI of the cervical spine every 2 years for the duration of life expectancy."
+- "Per Dr. Johnson's 7/15/25 recommendations, the patient will require annual EMG/NCS studies."
+
 ## Output Format:
 Return a JSON object with this structure:
 {{
@@ -162,6 +175,16 @@ Return a JSON object with this structure:
         "C1": "Annual surveillance of C5-6 disc herniation with moderate foraminal stenosis per 7/10/25 MRI.",
         "C4": "One-time cervical RFA for facet-mediated pain with documented 80% relief from 8/15/25 medial branch blocks."
     }},
+    "provider_items": [
+        {{
+            "item": "MRI Cervical Spine",
+            "frequency": "Every 2 years",
+            "provider_name": "Dr. John Smith",
+            "provider_quote": "The patient will require MRI of the cervical spine every 2 years to monitor disc progression.",
+            "body_part": "Cervical Spine",
+            "rationale": "Dr. John Smith recommended MRI of the cervical spine every 2 years for the duration of life expectancy to monitor disc progression."
+        }}
+    ],
     "summary": "52-year-old with cervical disc herniation and facet syndrome. MBB provided significant relief."
 }}
 
@@ -170,6 +193,18 @@ CRITICAL:
 - Rationales must reference SPECIFIC findings and DATES from the medical records
 - Rationales should read naturally - DO NOT mention scenario codes (C1, C4, etc.) or "clinical scenario"
 - Be conservative - typical cases have 2-5 scenarios, NOT 10+
+- Provider recommendations take PRECEDENCE - if a provider specifies a frequency, use that exact frequency
+- Always include the provider's name when citing their recommendation
+"""
+
+    # Build the user prompt with optional provider recommendations section
+    provider_section = ""
+    if provider_recommendations:
+        provider_section = f"""
+
+## Treating Provider Recommendations
+{provider_recommendations}
+
 """
 
     user_prompt = f"""## Patient Information
@@ -180,15 +215,17 @@ CRITICAL:
 - Age at Report: {patient_info.get('age_initiated', 'Unknown')}
 
 ## Medical Records Summary
-{medical_summary}
-
+{medical_summary if medical_summary else "No medical summary provided."}
+{provider_section}
 Please analyze the medical records above and:
 1. Identify all structural injuries by body region
 2. Apply the decision trees to determine which scenarios apply
 3. Provide patient-specific rationales for each scenario
-4. Return your analysis as a JSON object
+4. {"Extract ALL treating provider recommendations with exact frequencies and provider names" if provider_recommendations else ""}
+5. Return your analysis as a JSON object
 
-Remember: Only include scenarios for STRUCTURAL injuries. Sprains/strains get NO scenarios."""
+Remember: Only include scenarios for STRUCTURAL injuries. Sprains/strains get NO scenarios.
+{"IMPORTANT: Provider recommendations are included. Extract and cite each provider recommendation with their name and exact frequency." if provider_recommendations else ""}"""
 
     try:
         response = client.messages.create(
@@ -220,6 +257,7 @@ Remember: Only include scenarios for STRUCTURAL injuries. Sprains/strains get NO
             "scenarios": result.get("scenarios", []),
             "diagnoses": result.get("diagnoses", []),
             "rationales": result.get("rationales", {}),
+            "provider_items": result.get("provider_items", []),
             "summary": result.get("summary", ""),
             "error": None
         }
@@ -231,6 +269,7 @@ Remember: Only include scenarios for STRUCTURAL injuries. Sprains/strains get NO
             "scenarios": [],
             "diagnoses": [],
             "rationales": {},
+            "provider_items": [],
             "summary": "Analysis failed - please try again"
         }
     except Exception as e:
@@ -239,6 +278,7 @@ Remember: Only include scenarios for STRUCTURAL injuries. Sprains/strains get NO
             "scenarios": [],
             "diagnoses": [],
             "rationales": {},
+            "provider_items": [],
             "summary": "Analysis failed - please try again"
         }
 
