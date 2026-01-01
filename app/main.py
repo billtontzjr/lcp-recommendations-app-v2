@@ -5,7 +5,7 @@ import sys
 # Ensure repo root is in Python path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, render_template
+from flask import Flask, render_template, jsonify, request
 from whitenoise import WhiteNoise
 from app.config import Config
 from app.routes.health import health_bp
@@ -40,6 +40,21 @@ def create_app():
     @app.route('/admin')
     def admin():
         return render_template('admin.html')
+
+    # Global error handlers for API routes to ensure JSON responses
+    @app.errorhandler(500)
+    def internal_error(error):
+        if request.path.startswith('/api/'):
+            app.logger.error(f"Internal server error: {str(error)}")
+            return jsonify({'error': 'Internal server error. Please try again.'}), 500
+        return render_template('error.html', error=error), 500
+
+    @app.errorhandler(Exception)
+    def handle_exception(error):
+        if request.path.startswith('/api/'):
+            app.logger.error(f"Unhandled exception: {str(error)}")
+            return jsonify({'error': f'Server error: {str(error)}'}), 500
+        raise error
 
     return app
 

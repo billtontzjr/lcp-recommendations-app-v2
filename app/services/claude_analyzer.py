@@ -341,16 +341,29 @@ Remember: Only include scenarios for STRUCTURAL injuries. Sprains/strains get NO
         response_text = response.content[0].text
 
         # Try to parse JSON from the response
+        json_text = response_text
+
+        # First try: extract from ```json ... ``` blocks
         if "```json" in response_text:
             json_start = response_text.find("```json") + 7
             json_end = response_text.find("```", json_start)
-            response_text = response_text[json_start:json_end].strip()
+            if json_end > json_start:
+                json_text = response_text[json_start:json_end].strip()
+        # Second try: extract from ``` ... ``` blocks
         elif "```" in response_text:
             json_start = response_text.find("```") + 3
             json_end = response_text.find("```", json_start)
-            response_text = response_text[json_start:json_end].strip()
+            if json_end > json_start:
+                json_text = response_text[json_start:json_end].strip()
+        # Third try: find JSON object directly (starts with { ends with })
+        elif "{" in response_text:
+            # Find the first { and last }
+            first_brace = response_text.find("{")
+            last_brace = response_text.rfind("}")
+            if first_brace >= 0 and last_brace > first_brace:
+                json_text = response_text[first_brace:last_brace + 1]
 
-        result = json.loads(response_text)
+        result = json.loads(json_text)
 
         # Validate and normalize the response
         return {
