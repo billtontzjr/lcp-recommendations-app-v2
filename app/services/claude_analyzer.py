@@ -1,21 +1,35 @@
 """
-Claude API service for medical record analysis - Phase 1.
+AI service for medical record analysis - Phase 1.
 
 This module handles the AI-driven clinical decision phase:
 - Analyzes medical records to identify injuries/diagnoses
 - Applies decision trees to match clinical scenarios
 - Outputs scenario codes (C1, C4, L2, etc.)
 
+Supports multiple AI providers:
+- Google Gemini (default - fastest)
+- Anthropic Claude (fallback)
+
 The scenario codes are then mapped to item bundles by scenario_mapper.py (Phase 2).
 """
 
 import os
 import json
-from anthropic import Anthropic
 from app.services.scenario_bundles import get_scenario_summary
 from app.services.custom_rules import get_rules_for_analysis
 from app.services.knowledge_base import get_knowledge_base_for_prompt
 from app.services.causation_analyzer import get_causation_protocol_for_prompt
+
+
+def get_ai_provider():
+    """Determine which AI provider to use based on environment variables."""
+    # Check for Gemini API key first (preferred for speed)
+    if os.getenv('GOOGLE_API_KEY') or os.getenv('GEMINI_API_KEY'):
+        return 'gemini'
+    # Fall back to Claude
+    if os.getenv('ANTHROPIC_API_KEY'):
+        return 'claude'
+    return None
 
 
 def get_scenario_list_for_prompt() -> str:
@@ -44,7 +58,27 @@ def analyze_medical_records(medical_summary: str, patient_info: dict, provider_r
         - provider_items: List of items directly recommended by treating providers
         - summary: Brief summary of injuries and care needs
     """
-    client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+    # Determine which AI provider to use
+    provider = get_ai_provider()
+
+    if provider == 'gemini':
+        return _analyze_with_gemini(medical_summary, patient_info, provider_recommendations)
+    elif provider == 'claude':
+        return _analyze_with_claude(medical_summary, patient_info, provider_recommendations)
+    else:
+        return {
+            "error": "No AI API key configured. Set GOOGLE_API_KEY or ANTHROPIC_API_KEY.",
+            "scenarios": [],
+            "diagnoses": [],
+            "excluded_diagnoses": [],
+            "rationales": {},
+            "provider_items": [],
+            "summary": "Analysis failed - no API key"
+        }
+
+
+def _build_prompts(patient_info: dict, medical_summary: str, provider_recommendations: str = ""):
+    """Build the system and user prompts for analysis."""
 
     scenario_list = get_scenario_list_for_prompt()
     custom_rules = get_rules_for_analysis()
@@ -327,7 +361,100 @@ Please analyze the medical records above and:
 Remember: Only include scenarios for STRUCTURAL injuries. Sprains/strains get NO scenarios.
 {"IMPORTANT: Provider recommendations are included. Extract and cite each provider recommendation with their name and exact frequency." if provider_recommendations else ""}"""
 
+    return system_prompt, user_prompt
+
+
+def _parse_json_response(response_text: str) -> dict:
+    """Parse JSON from AI response, handling various formats."""
+    json_text = response_text
+
+    # First try: extract from ```json ... ``` blocks
+    if "```json" in response_text:
+        json_start = response_text.find("```json") + 7
+        json_end = response_text.find("```", json_start)
+        if json_end > json_start:
+            json_text = response_text[json_start:json_end].strip()
+    # Second try: extract from ``` ... ``` blocks
+    elif "```" in response_text:
+        json_start = response_text.find("```") + 3
+        json_end = response_text.find("```", json_start)
+        if json_end > json_start:
+            json_text = response_text[json_start:json_end].strip()
+    # Third try: find JSON object directly (starts with { ends with })
+    elif "{" in response_text:
+        first_brace = response_text.find("{")
+        last_brace = response_text.rfind("}")
+        if first_brace >= 0 and last_brace > first_brace:
+            json_text = response_text[first_brace:last_brace + 1]
+
+    result = json.loads(json_text)
+
+    return {
+        "scenarios": result.get("scenarios", []),
+        "diagnoses": result.get("diagnoses", []),
+        "excluded_diagnoses": result.get("excluded_diagnoses", []),
+        "rationales": result.get("rationales", {}),
+        "provider_items": result.get("provider_items", []),
+        "summary": result.get("summary", ""),
+        "error": None
+    }
+
+
+def _analyze_with_gemini(medical_summary: str, patient_info: dict, provider_recommendations: str = "") -> dict:
+    """Analyze medical records using Google Gemini."""
     try:
+        import google.generativeai as genai
+
+        # Configure Gemini
+        api_key = os.getenv('GOOGLE_API_KEY') or os.getenv('GEMINI_API_KEY')
+        genai.configure(api_key=api_key)
+
+        # Build prompts
+        system_prompt, user_prompt = _build_prompts(patient_info, medical_summary, provider_recommendations)
+
+        # Combine system and user prompts for Gemini
+        full_prompt = f"{system_prompt}\n\n---\n\n{user_prompt}"
+
+        # Create model and generate
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        response = model.generate_content(full_prompt)
+
+        response_text = response.text
+        return _parse_json_response(response_text)
+
+    except json.JSONDecodeError as e:
+        return {
+            "error": f"Failed to parse Gemini response: {str(e)}",
+            "raw_response": response_text if 'response_text' in locals() else "No response",
+            "scenarios": [],
+            "diagnoses": [],
+            "excluded_diagnoses": [],
+            "rationales": {},
+            "provider_items": [],
+            "summary": "Analysis failed - please try again"
+        }
+    except Exception as e:
+        return {
+            "error": f"Gemini API error: {str(e)}",
+            "scenarios": [],
+            "diagnoses": [],
+            "excluded_diagnoses": [],
+            "rationales": {},
+            "provider_items": [],
+            "summary": "Analysis failed - please try again"
+        }
+
+
+def _analyze_with_claude(medical_summary: str, patient_info: dict, provider_recommendations: str = "") -> dict:
+    """Analyze medical records using Anthropic Claude."""
+    try:
+        from anthropic import Anthropic
+
+        client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+
+        # Build prompts
+        system_prompt, user_prompt = _build_prompts(patient_info, medical_summary, provider_recommendations)
+
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4096,
@@ -337,44 +464,8 @@ Remember: Only include scenarios for STRUCTURAL injuries. Sprains/strains get NO
             system=system_prompt
         )
 
-        # Extract the response text
         response_text = response.content[0].text
-
-        # Try to parse JSON from the response
-        json_text = response_text
-
-        # First try: extract from ```json ... ``` blocks
-        if "```json" in response_text:
-            json_start = response_text.find("```json") + 7
-            json_end = response_text.find("```", json_start)
-            if json_end > json_start:
-                json_text = response_text[json_start:json_end].strip()
-        # Second try: extract from ``` ... ``` blocks
-        elif "```" in response_text:
-            json_start = response_text.find("```") + 3
-            json_end = response_text.find("```", json_start)
-            if json_end > json_start:
-                json_text = response_text[json_start:json_end].strip()
-        # Third try: find JSON object directly (starts with { ends with })
-        elif "{" in response_text:
-            # Find the first { and last }
-            first_brace = response_text.find("{")
-            last_brace = response_text.rfind("}")
-            if first_brace >= 0 and last_brace > first_brace:
-                json_text = response_text[first_brace:last_brace + 1]
-
-        result = json.loads(json_text)
-
-        # Validate and normalize the response
-        return {
-            "scenarios": result.get("scenarios", []),
-            "diagnoses": result.get("diagnoses", []),
-            "excluded_diagnoses": result.get("excluded_diagnoses", []),
-            "rationales": result.get("rationales", {}),
-            "provider_items": result.get("provider_items", []),
-            "summary": result.get("summary", ""),
-            "error": None
-        }
+        return _parse_json_response(response_text)
 
     except json.JSONDecodeError as e:
         return {
