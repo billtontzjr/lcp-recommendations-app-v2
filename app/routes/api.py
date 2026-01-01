@@ -131,13 +131,15 @@ def generate_lcp():
             if analysis_result.get('error'):
                 current_app.logger.warning(f"Claude analysis warning: {analysis_result['error']}")
 
-            # Get scenario codes and provider items from Claude's analysis
+            # Get scenario codes, rationales, provider items, and excluded diagnoses from Claude's analysis
             scenario_codes = analysis_result.get('scenarios', [])
             rationales = analysis_result.get('rationales', {})
             provider_items = analysis_result.get('provider_items', [])
+            excluded_diagnoses = analysis_result.get('excluded_diagnoses', [])
 
             current_app.logger.info(f"Claude identified scenarios: {scenario_codes}")
             current_app.logger.info(f"Claude identified {len(provider_items)} provider-recommended items")
+            current_app.logger.info(f"Claude excluded {len(excluded_diagnoses)} diagnoses due to causation")
 
             if not scenario_codes and not provider_items:
                 return jsonify({
@@ -158,11 +160,14 @@ def generate_lcp():
             cost_data['analysis'] = {
                 'scenarios': scenario_codes,
                 'diagnoses': analysis_result.get('diagnoses', []),
+                'excluded_diagnoses': excluded_diagnoses,
                 'provider_items': provider_items,
                 'summary': analysis_result.get('summary', '')
             }
 
         else:
+            # In traditional mode, no excluded diagnoses
+            excluded_diagnoses = []
             # TRADITIONAL MODE: Use pre-checked items from workbook
             current_app.logger.info("Traditional mode: Using pre-checked items from workbook")
             workbook_data = parse_workbook(workbook_path)
@@ -177,7 +182,8 @@ def generate_lcp():
         generate_lcp_document(
             workbook_data['patient_info'],
             cost_data,
-            doc_path
+            doc_path,
+            excluded_diagnoses=excluded_diagnoses
         )
 
         # Try to save to Supabase (optional - works without it)

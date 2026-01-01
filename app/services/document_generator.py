@@ -177,9 +177,15 @@ def add_new_page(doc):
     doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
 
 
-def generate_lcp_document(patient_info, cost_data, output_path):
+def generate_lcp_document(patient_info, cost_data, output_path, excluded_diagnoses=None):
     """
     Generate the Life Care Plan Recommendations Word document.
+
+    Args:
+        patient_info: Patient demographic information
+        cost_data: Cost calculations and items by category
+        output_path: Path to save the generated document
+        excluded_diagnoses: Optional list of diagnoses excluded due to causation analysis
     """
     doc = Document()
 
@@ -206,6 +212,11 @@ def generate_lcp_document(patient_info, cost_data, output_path):
     for category, data in cost_data['category_totals'].items():
         add_new_page(doc)
         add_section_page(doc, patient_info, category, data, cost_data['totals'])
+
+    # Add Excluded Diagnoses page if there are any (causation analysis)
+    if excluded_diagnoses:
+        add_new_page(doc)
+        add_excluded_diagnoses_page(doc, excluded_diagnoses)
 
     # Add Suggested New Rows page if there are any
     suggested_rows = cost_data.get('suggested_rows', [])
@@ -586,3 +597,94 @@ def add_suggested_rows_page(doc, suggested_rows):
     run.font.name = FONT_NAME
     run.font.size = Pt(9)
     run.font.italic = True
+
+
+def add_excluded_diagnoses_page(doc, excluded_diagnoses):
+    """
+    Add a page showing diagnoses that were excluded from the LCP due to causation analysis.
+
+    These are conditions that were identified but determined to NOT be causally related
+    to the injury event (or are self-limiting sprains/strains).
+    """
+    if not excluded_diagnoses:
+        return
+
+    # Header
+    header = doc.add_paragraph()
+    header.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = header.add_run('EXCLUDED DIAGNOSES - CAUSATION ANALYSIS')
+    run.font.name = FONT_NAME
+    run.font.size = Pt(14)
+    run.font.bold = True
+
+    doc.add_paragraph()
+
+    # Explanation
+    explanation = doc.add_paragraph()
+    run = explanation.add_run(
+        'The following diagnoses were identified in the medical records but were excluded from '
+        'the Life Care Plan based on causation analysis using Michael Freeman\'s three-prong test '
+        '(temporal relationship, biological plausibility, absence of alternative explanation). '
+        'Only conditions causally related to the injury event qualify for LCP recommendations.'
+    )
+    run.font.name = FONT_NAME
+    run.font.size = Pt(10)
+    run.font.italic = True
+
+    doc.add_paragraph()
+
+    # Create table for excluded diagnoses
+    num_rows = 1 + len(excluded_diagnoses)  # header + data rows
+    table = doc.add_table(rows=num_rows, cols=4)
+    table.style = 'Table Grid'
+
+    # Column widths
+    col_widths = [Inches(1.5), Inches(2.0), Inches(1.5), Inches(3.2)]
+    for row in table.rows:
+        for i, width in enumerate(col_widths):
+            row.cells[i].width = width
+
+    # Row 0: Headers
+    headers = ['Body Part', 'Diagnosis', 'Classification', 'Reason for Exclusion']
+    for i, header_text in enumerate(headers):
+        format_cell_text(table.rows[0].cells[i], header_text, Pt(10), bold=True, center=True, gray=True)
+
+    # Data rows
+    for row_idx, diagnosis in enumerate(excluded_diagnoses, start=1):
+        format_cell_text(table.rows[row_idx].cells[0], diagnosis.get('body_part', ''), Pt(10))
+        format_cell_text(table.rows[row_idx].cells[1], diagnosis.get('diagnosis', ''), Pt(10))
+
+        # Format causation classification for display
+        causation = diagnosis.get('causation', '').replace('_', ' ').title()
+        format_cell_text(table.rows[row_idx].cells[2], causation, Pt(10), center=True)
+
+        reason = diagnosis.get('reason', '') or diagnosis.get('causation_rationale', '')
+        format_cell_text(table.rows[row_idx].cells[3], reason, Pt(9))
+
+    set_bold_borders(table)
+
+    doc.add_paragraph()
+
+    # Classification legend
+    legend_header = doc.add_paragraph()
+    run = legend_header.add_run('Classification Legend:')
+    run.font.name = FONT_NAME
+    run.font.size = Pt(10)
+    run.font.bold = True
+
+    legend_items = [
+        ('Not Causal', 'Condition not related to the injury event (pre-existing without aggravation, alternative cause)'),
+        ('Exacerbation', 'Temporary worsening of pre-existing condition; expected to return to baseline'),
+        ('Sprain/Strain', 'Muscular injury expected to resolve within 6-12 weeks; no ongoing care needs'),
+    ]
+
+    for classification, description in legend_items:
+        para = doc.add_paragraph()
+        run = para.add_run(f'{classification}: ')
+        run.font.name = FONT_NAME
+        run.font.size = Pt(9)
+        run.font.bold = True
+        run = para.add_run(description)
+        run.font.name = FONT_NAME
+        run.font.size = Pt(9)
+        para.paragraph_format.space_after = Pt(2)

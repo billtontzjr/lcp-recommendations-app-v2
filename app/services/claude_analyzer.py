@@ -15,6 +15,7 @@ from anthropic import Anthropic
 from app.services.scenario_bundles import get_scenario_summary
 from app.services.custom_rules import get_rules_for_analysis
 from app.services.knowledge_base import get_knowledge_base_for_prompt
+from app.services.causation_analyzer import get_causation_protocol_for_prompt
 
 
 def get_scenario_list_for_prompt() -> str:
@@ -48,6 +49,7 @@ def analyze_medical_records(medical_summary: str, patient_info: dict, provider_r
     scenario_list = get_scenario_list_for_prompt()
     custom_rules = get_rules_for_analysis()
     knowledge_base = get_knowledge_base_for_prompt()
+    causation_protocol = get_causation_protocol_for_prompt()
 
     system_prompt = f"""You are a medical expert assistant helping Dr. William Tontz, MD, CLCP identify applicable clinical scenarios for Life Care Plans.
 
@@ -55,7 +57,14 @@ def analyze_medical_records(medical_summary: str, patient_info: dict, provider_r
 
 {knowledge_base}
 
-Your task is to analyze medical records and identify which predefined clinical scenarios apply to this patient.
+{causation_protocol}
+
+Your task is to analyze medical records, DETERMINE CAUSATION for each diagnosis, and identify which predefined clinical scenarios apply to this patient.
+
+**CRITICAL CAUSATION REQUIREMENT:**
+Before assigning ANY scenario code, you MUST first determine whether each diagnosis is causally related to the injury event.
+Only diagnoses classified as "causal" or "aggravation" qualify for LCP recommendations.
+Diagnoses classified as "exacerbation", "sprain_strain", or "not_causal" must be EXCLUDED from scenario assignment.
 
 ## Available Clinical Scenarios:
 {scenario_list}
@@ -206,8 +215,44 @@ Return a JSON object with this structure:
 {{
     "scenarios": ["C1", "C4"],
     "diagnoses": [
-        {{"body_part": "Cervical Spine", "diagnosis": "C5-6 disc herniation", "structural": true, "date_documented": "7/10/2025"}},
-        {{"body_part": "Cervical Spine", "diagnosis": "Facet syndrome", "structural": true, "date_documented": "7/10/2025"}}
+        {{
+            "body_part": "Cervical Spine",
+            "diagnosis": "C5-6 disc herniation",
+            "structural": true,
+            "date_documented": "7/10/2025",
+            "causation": "causal",
+            "causation_rationale": "New cervical radiculopathy documented in ED on 1/15/25, 2 days post-MVA. No prior cervical complaints in 5 years of records reviewed. Mechanism consistent with disc injury."
+        }},
+        {{
+            "body_part": "Cervical Spine",
+            "diagnosis": "Facet syndrome",
+            "structural": true,
+            "date_documented": "7/10/2025",
+            "causation": "causal",
+            "causation_rationale": "Facet-mediated pain documented 3 weeks post-MVA after extension/rotation mechanism. Diagnostic MBB on 8/15/25 confirmed facet origin. No prior facet treatment."
+        }},
+        {{
+            "body_part": "Lumbar Spine",
+            "diagnosis": "L4-5 stenosis",
+            "structural": true,
+            "date_documented": "7/10/2025",
+            "causation": "not_causal",
+            "causation_rationale": "Pre-existing stenosis documented on 2018 MRI. No change in symptoms or treatment pattern post-accident. Excluded from LCP."
+        }}
+    ],
+    "excluded_diagnoses": [
+        {{
+            "body_part": "Lumbar Spine",
+            "diagnosis": "L4-5 stenosis",
+            "causation": "not_causal",
+            "reason": "Pre-existing condition without aggravation - no change in care pattern"
+        }},
+        {{
+            "body_part": "Right Shoulder",
+            "diagnosis": "Rotator cuff strain",
+            "causation": "sprain_strain",
+            "reason": "Muscular strain expected to resolve in 6-12 weeks - no ongoing LCP needs"
+        }}
     ],
     "rationales": {{
         "C1": "Annual surveillance of C5-6 disc herniation with moderate foraminal stenosis per 7/10/25 MRI.",
@@ -235,16 +280,21 @@ Return a JSON object with this structure:
             "rationale": "Dr. Jane Doe recommended annual otolaryngology follow-up for ongoing management."
         }}
     ],
-    "summary": "52-year-old with cervical disc herniation and facet syndrome. MBB provided significant relief."
+    "summary": "52-year-old with cervical disc herniation and facet syndrome causally related to 1/13/25 MVA. Pre-existing lumbar stenosis excluded (no aggravation). MBB provided significant relief."
 }}
 
 CRITICAL:
+- **CAUSATION FIRST**: You MUST determine causation for EVERY diagnosis BEFORE assigning scenarios
+- Only assign scenarios to diagnoses with causation = "causal" or "aggravation"
+- EXCLUDE diagnoses with causation = "exacerbation", "sprain_strain", or "not_causal" from scenarios
+- Include ALL excluded diagnoses in the "excluded_diagnoses" array with clear reasons
 - Scenarios must be from the available list above
 - Rationales must reference SPECIFIC findings and DATES from the medical records
 - Rationales should read naturally - DO NOT mention scenario codes (C1, C4, etc.) or "clinical scenario"
 - Be conservative - typical cases have 2-5 scenarios, NOT 10+
 - Provider recommendations take PRECEDENCE - if a provider specifies a frequency, use that exact frequency
 - Always include the provider's name when citing their recommendation
+- Sprain/strain CANNOT coexist with deeper diagnoses (disc herniation, stenosis, fracture, labral/meniscal tear) in the same body part
 """
 
     # Build the user prompt with optional provider recommendations section
@@ -306,6 +356,7 @@ Remember: Only include scenarios for STRUCTURAL injuries. Sprains/strains get NO
         return {
             "scenarios": result.get("scenarios", []),
             "diagnoses": result.get("diagnoses", []),
+            "excluded_diagnoses": result.get("excluded_diagnoses", []),
             "rationales": result.get("rationales", {}),
             "provider_items": result.get("provider_items", []),
             "summary": result.get("summary", ""),
@@ -318,6 +369,7 @@ Remember: Only include scenarios for STRUCTURAL injuries. Sprains/strains get NO
             "raw_response": response_text if 'response_text' in locals() else "No response",
             "scenarios": [],
             "diagnoses": [],
+            "excluded_diagnoses": [],
             "rationales": {},
             "provider_items": [],
             "summary": "Analysis failed - please try again"
@@ -327,6 +379,7 @@ Remember: Only include scenarios for STRUCTURAL injuries. Sprains/strains get NO
             "error": f"Claude API error: {str(e)}",
             "scenarios": [],
             "diagnoses": [],
+            "excluded_diagnoses": [],
             "rationales": {},
             "provider_items": [],
             "summary": "Analysis failed - please try again"
