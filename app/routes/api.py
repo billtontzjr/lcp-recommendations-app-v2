@@ -53,19 +53,23 @@ def generate_lcp():
     Generate LCP recommendations from uploaded workbook.
 
     Expects multipart/form-data with:
-        - file: Master Workbook (.xlsm/.xlsx)
-        - medical_summary: Optional medical summary (.docx)
-        - provider_recommendations: Optional treating provider recommendations (.docx)
+        - file: Master Workbook (.xlsm/.xlsx) - REQUIRED
+        - causation_analysis: Causation analysis document (.docx/.pdf) - REQUIRED
+        - medical_summary: Medical summary (.docx/.pdf) - REQUIRED
+        - provider_recommendations: Optional treating provider recommendations (.docx/.pdf)
 
-    If medical_summary or provider_recommendations is provided, uses Claude AI
-    to analyze records and automatically select appropriate items based on
-    clinical scenarios and provider recommendations.
-
-    If no documents provided, uses pre-checked items from workbook.
+    The workflow:
+    1. User provides their causation analysis (done externally)
+    2. Causation parser extracts which body parts are causally related
+    3. AI matches medical history to stored clinical scenarios
+    4. Only scenarios for causally-related body parts are included
+    5. LCP document is generated
 
     Returns:
         The generated Word document as a download
     """
+    from app.services.causation_parser import parse_causation_document, get_causation_summary
+
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
 
@@ -83,72 +87,106 @@ def generate_lcp():
     workbook_path = os.path.join(temp_dir, filename)
     file.save(workbook_path)
 
-    # Check for medical summary file (enables AI-powered selection)
+    # Check for causation analysis file (REQUIRED in new workflow)
+    causation_path = None
+    if 'causation_analysis' in request.files:
+        causation_file = request.files['causation_analysis']
+        if causation_file.filename:
+            ext = causation_file.filename.rsplit('.', 1)[-1].lower()
+            if ext in ['docx', 'pdf']:
+                causation_filename = secure_filename(causation_file.filename)
+                causation_path = os.path.join(temp_dir, causation_filename)
+                causation_file.save(causation_path)
+
+    # Check for medical summary file (REQUIRED in new workflow)
     medical_summary_path = None
     if 'medical_summary' in request.files:
         summary_file = request.files['medical_summary']
-        if summary_file.filename and summary_file.filename.endswith('.docx'):
-            summary_filename = secure_filename(summary_file.filename)
-            medical_summary_path = os.path.join(temp_dir, summary_filename)
-            summary_file.save(medical_summary_path)
+        if summary_file.filename:
+            ext = summary_file.filename.rsplit('.', 1)[-1].lower()
+            if ext in ['docx', 'pdf']:
+                summary_filename = secure_filename(summary_file.filename)
+                medical_summary_path = os.path.join(temp_dir, summary_filename)
+                summary_file.save(medical_summary_path)
 
-    # Check for provider recommendations file
+    # Check for provider recommendations file (OPTIONAL)
     provider_recommendations_path = None
     if 'provider_recommendations' in request.files:
         provider_file = request.files['provider_recommendations']
-        if provider_file.filename and provider_file.filename.endswith('.docx'):
-            provider_filename = secure_filename(provider_file.filename)
-            provider_recommendations_path = os.path.join(temp_dir, provider_filename)
-            provider_file.save(provider_recommendations_path)
+        if provider_file.filename:
+            ext = provider_file.filename.rsplit('.', 1)[-1].lower()
+            if ext in ['docx', 'pdf']:
+                provider_filename = secure_filename(provider_file.filename)
+                provider_recommendations_path = os.path.join(temp_dir, provider_filename)
+                provider_file.save(provider_recommendations_path)
 
     try:
-        if medical_summary_path or provider_recommendations_path:
-            # AI-POWERED MODE: Use Claude to identify scenarios, then map to items
-            current_app.logger.info("AI-powered mode: Analyzing medical records with Claude")
+        # NEW WORKFLOW: Causation + Medical Summary required
+        if causation_path and medical_summary_path:
+            current_app.logger.info("New workflow: Using causation analysis + scenario matching")
 
             # Parse workbook to get patient info and pricing lookups
             workbook_data = parse_workbook_all_items(workbook_path)
 
-            # Extract text from medical summary (if provided)
+            # Step 1: Parse the user's causation analysis document
+            current_app.logger.info("Parsing causation analysis document...")
+            causation_data = parse_causation_document(causation_path)
+            causation_summary = get_causation_summary(causation_data)
+            current_app.logger.info(f"Causation summary: {causation_summary[:500]}")
+
+            # Step 2: Extract text from medical summary
             medical_text = ""
             if medical_summary_path:
-                medical_text = extract_text_from_docx(medical_summary_path)
+                if medical_summary_path.endswith('.pdf'):
+                    import fitz
+                    doc = fitz.open(medical_summary_path)
+                    medical_text = '\n'.join([page.get_text() for page in doc])
+                    doc.close()
+                else:
+                    medical_text = extract_text_from_docx(medical_summary_path)
 
-            # Extract text from provider recommendations (if provided)
+            # Step 3: Extract text from provider recommendations (if provided)
             provider_text = ""
             if provider_recommendations_path:
-                provider_text = extract_text_from_docx(provider_recommendations_path)
+                if provider_recommendations_path.endswith('.pdf'):
+                    import fitz
+                    doc = fitz.open(provider_recommendations_path)
+                    provider_text = '\n'.join([page.get_text() for page in doc])
+                    doc.close()
+                else:
+                    provider_text = extract_text_from_docx(provider_recommendations_path)
                 current_app.logger.info("Provider recommendations document uploaded")
 
-            # Phase 1: Use Claude to identify applicable scenarios
+            # Step 4: Use AI to match scenarios (with causation constraints)
             analysis_result = analyze_medical_records(
                 medical_text,
                 workbook_data['patient_info'],
-                provider_recommendations=provider_text
+                provider_recommendations=provider_text,
+                causation_data=causation_data  # Pass causation data to AI
             )
 
-            # Check for errors in Claude response
+            # Check for errors in analysis
             if analysis_result.get('error'):
-                current_app.logger.warning(f"Claude analysis warning: {analysis_result['error']}")
+                current_app.logger.warning(f"AI analysis warning: {analysis_result['error']}")
 
-            # Get scenario codes, rationales, provider items, and excluded diagnoses from Claude's analysis
+            # Get scenario codes, rationales, provider items, and excluded diagnoses
             scenario_codes = analysis_result.get('scenarios', [])
             rationales = analysis_result.get('rationales', {})
             provider_items = analysis_result.get('provider_items', [])
             excluded_diagnoses = analysis_result.get('excluded_diagnoses', [])
 
-            current_app.logger.info(f"Claude identified scenarios: {scenario_codes}")
-            current_app.logger.info(f"Claude identified {len(provider_items)} provider-recommended items")
-            current_app.logger.info(f"Claude excluded {len(excluded_diagnoses)} diagnoses due to causation")
+            current_app.logger.info(f"AI identified scenarios: {scenario_codes}")
+            current_app.logger.info(f"AI identified {len(provider_items)} provider-recommended items")
+            current_app.logger.info(f"Excluded {len(excluded_diagnoses)} diagnoses based on causation")
 
             if not scenario_codes and not provider_items:
                 return jsonify({
                     'error': 'No clinical scenarios or provider recommendations were identified. '
                              'Please ensure the medical summary contains structural diagnoses '
-                             '(herniations, tears, fractures, etc.) or upload treating provider recommendations.'
+                             'that are causally related per your causation analysis.'
                 }), 400
 
-            # Phase 2: Map scenarios to items with costs (deterministic)
+            # Step 5: Map scenarios to items with costs
             cost_data = scenarios_to_cost_data(
                 scenario_codes,
                 workbook_data,
@@ -162,13 +200,75 @@ def generate_lcp():
                 'diagnoses': analysis_result.get('diagnoses', []),
                 'excluded_diagnoses': excluded_diagnoses,
                 'provider_items': provider_items,
+                'summary': analysis_result.get('summary', ''),
+                'causation_summary': causation_summary
+            }
+
+        elif medical_summary_path:
+            # LEGACY MODE: Medical summary without causation (for backwards compatibility)
+            current_app.logger.info("Legacy mode: Medical summary without causation analysis")
+
+            workbook_data = parse_workbook_all_items(workbook_path)
+
+            medical_text = ""
+            if medical_summary_path.endswith('.pdf'):
+                import fitz
+                doc = fitz.open(medical_summary_path)
+                medical_text = '\n'.join([page.get_text() for page in doc])
+                doc.close()
+            else:
+                medical_text = extract_text_from_docx(medical_summary_path)
+
+            provider_text = ""
+            if provider_recommendations_path:
+                if provider_recommendations_path.endswith('.pdf'):
+                    import fitz
+                    doc = fitz.open(provider_recommendations_path)
+                    provider_text = '\n'.join([page.get_text() for page in doc])
+                    doc.close()
+                else:
+                    provider_text = extract_text_from_docx(provider_recommendations_path)
+
+            analysis_result = analyze_medical_records(
+                medical_text,
+                workbook_data['patient_info'],
+                provider_recommendations=provider_text
+            )
+
+            if analysis_result.get('error'):
+                current_app.logger.warning(f"AI analysis warning: {analysis_result['error']}")
+
+            scenario_codes = analysis_result.get('scenarios', [])
+            rationales = analysis_result.get('rationales', {})
+            provider_items = analysis_result.get('provider_items', [])
+            excluded_diagnoses = analysis_result.get('excluded_diagnoses', [])
+
+            current_app.logger.info(f"AI identified scenarios: {scenario_codes}")
+
+            if not scenario_codes and not provider_items:
+                return jsonify({
+                    'error': 'No clinical scenarios or provider recommendations were identified. '
+                             'Please ensure the medical summary contains structural diagnoses.'
+                }), 400
+
+            cost_data = scenarios_to_cost_data(
+                scenario_codes,
+                workbook_data,
+                rationales,
+                provider_items=provider_items
+            )
+
+            cost_data['analysis'] = {
+                'scenarios': scenario_codes,
+                'diagnoses': analysis_result.get('diagnoses', []),
+                'excluded_diagnoses': excluded_diagnoses,
+                'provider_items': provider_items,
                 'summary': analysis_result.get('summary', '')
             }
 
         else:
-            # In traditional mode, no excluded diagnoses
-            excluded_diagnoses = []
             # TRADITIONAL MODE: Use pre-checked items from workbook
+            excluded_diagnoses = []
             current_app.logger.info("Traditional mode: Using pre-checked items from workbook")
             workbook_data = parse_workbook(workbook_path)
             cost_data = calculate_all_costs(workbook_data)
@@ -229,6 +329,8 @@ def generate_lcp():
         try:
             if os.path.exists(workbook_path):
                 os.remove(workbook_path)
+            if causation_path and os.path.exists(causation_path):
+                os.remove(causation_path)
             if medical_summary_path and os.path.exists(medical_summary_path):
                 os.remove(medical_summary_path)
             if provider_recommendations_path and os.path.exists(provider_recommendations_path):
@@ -674,3 +776,140 @@ def get_knowledge_base_history():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# SCENARIO MASTER SYSTEM ENDPOINTS
+# =============================================================================
+
+@api_bp.route('/scenario-master/upload', methods=['POST'])
+def upload_scenario_master():
+    """
+    Upload and parse the Scenario Master System document.
+    Accepts markdown (.md) files.
+    """
+    from app.services.scenario_master_parser import parse_and_store_scenario_master
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    # Check file extension
+    if not file.filename.lower().endswith('.md'):
+        return jsonify({'error': 'Only markdown (.md) files are supported'}), 400
+
+    try:
+        # Read the file content
+        content = file.read().decode('utf-8')
+        document_name = secure_filename(file.filename)
+
+        # Parse and store in Supabase
+        result = parse_and_store_scenario_master(content, document_name)
+
+        if result.get('success'):
+            return jsonify({
+                'success': True,
+                'message': 'Scenario Master System uploaded successfully',
+                'document_name': document_name,
+                'rule_count': result.get('rules_parsed', 0),
+                'scenario_count': result.get('scenarios_parsed', 0),
+                'recommendation_count': result.get('recommendations_parsed', 0)
+            })
+        else:
+            return jsonify({
+                'error': 'Failed to parse document',
+                'details': result.get('errors', [])
+            }), 500
+
+    except Exception as e:
+        current_app.logger.error(f"Error uploading scenario master: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/scenario-master/scenarios', methods=['GET'])
+def get_scenario_master_scenarios():
+    """
+    Get all scenario definitions from Scenario Master System.
+    """
+    from app.services.scenario_master_parser import get_all_scenarios
+
+    try:
+        scenarios = get_all_scenarios()
+        return jsonify({'scenarios': scenarios})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/scenario-master/scenarios/<scenario_code>', methods=['GET'])
+def get_scenario_master_detail(scenario_code):
+    """
+    Get a specific scenario with its recommendations from Scenario Master System.
+    """
+    from app.services.scenario_master_parser import get_scenario_by_code, get_scenario_recommendations
+
+    try:
+        scenario = get_scenario_by_code(scenario_code)
+        if not scenario:
+            return jsonify({'error': f'Scenario {scenario_code} not found'}), 404
+
+        recommendations = get_scenario_recommendations(scenario_code)
+        scenario['recommendations'] = recommendations
+
+        return jsonify(scenario)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/scenario-master/rules', methods=['GET'])
+def get_global_rules():
+    """
+    Get all global rules from the Scenario Master System.
+    """
+    from app.services.scenario_master_parser import get_global_rules
+
+    try:
+        rules = get_global_rules()
+        return jsonify({'rules': rules})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/scenario-master/status', methods=['GET'])
+def get_scenario_master_status():
+    """
+    Get the status of the Scenario Master System (is it loaded?).
+    """
+    from app.services.scenario_master_parser import get_all_scenarios, get_global_rules
+    from app.services.supabase_client import get_supabase_client
+
+    try:
+        supabase = get_supabase_client()
+        if not supabase:
+            return jsonify({
+                'loaded': False,
+                'error': 'Supabase not configured'
+            })
+
+        scenarios = get_all_scenarios()
+        rules = get_global_rules()
+
+        # Get latest version info
+        result = supabase.table('scenario_master_versions').select('*').eq('is_active', True).order('created_at', desc=True).limit(1).execute()
+        version_info = result.data[0] if result.data else None
+
+        return jsonify({
+            'loaded': len(scenarios) > 0,
+            'scenario_count': len(scenarios),
+            'rule_count': len(rules),
+            'version_info': version_info
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e), 'loaded': False}), 500

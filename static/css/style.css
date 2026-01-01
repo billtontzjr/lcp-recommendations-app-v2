@@ -12,7 +12,7 @@ body {
 }
 
 .container {
-    max-width: 800px;
+    max-width: 900px;
     margin: 0 auto;
     padding: 20px;
     min-height: 100vh;
@@ -43,21 +43,29 @@ main {
     flex: 1;
 }
 
-.upload-section {
+/* Upload Grid Layout */
+.upload-grid {
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    margin-bottom: 30px;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.upload-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
 }
 
 .upload-box {
     border: 2px dashed #cbd5e0;
     border-radius: 8px;
-    padding: 40px 20px;
+    padding: 25px 15px;
     text-align: center;
     cursor: pointer;
     transition: all 0.3s ease;
     background-color: white;
+    position: relative;
 }
 
 .upload-box:hover {
@@ -73,50 +81,108 @@ main {
 .upload-box.has-file {
     border-color: #38a169;
     background-color: #f0fff4;
+    border-style: solid;
+}
+
+.upload-box.primary {
+    border-color: #2c5282;
+    border-width: 2px;
 }
 
 .upload-box.secondary {
-    padding: 25px 20px;
-}
-
-.upload-box.tertiary {
-    padding: 25px 20px;
     border-style: dotted;
+    border-color: #a0aec0;
 }
 
-.upload-box.tertiary:hover {
+.upload-box.secondary:hover {
     border-color: #805ad5;
     background-color: #faf5ff;
 }
 
-.upload-box.tertiary.has-file {
+.upload-box.secondary.has-file {
     border-color: #805ad5;
     background-color: #faf5ff;
     border-style: solid;
 }
 
+/* Upload Badges */
+.upload-badge {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.upload-badge.required {
+    background-color: #2c5282;
+    color: white;
+}
+
+.upload-badge.optional {
+    background-color: #a0aec0;
+    color: white;
+}
+
 .upload-icon {
-    font-size: 2.5rem;
-    margin-bottom: 10px;
+    font-size: 2rem;
+    margin-bottom: 8px;
 }
 
 .upload-text {
-    color: #4a5568;
-    font-size: 1rem;
-    margin-bottom: 5px;
+    color: #2d3748;
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 4px;
 }
 
 .upload-subtext {
     color: #a0aec0;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
 }
 
 .file-name {
     margin-top: 10px;
     color: #2c5282;
     font-weight: 600;
+    font-size: 0.85rem;
+    word-break: break-all;
 }
 
+/* Workflow Info Box */
+.workflow-info {
+    background-color: #ebf8ff;
+    border: 1px solid #bee3f8;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 25px;
+}
+
+.workflow-info h3 {
+    color: #2c5282;
+    font-size: 1rem;
+    margin-bottom: 12px;
+}
+
+.workflow-info ol {
+    margin-left: 20px;
+    color: #4a5568;
+    font-size: 0.9rem;
+}
+
+.workflow-info li {
+    margin-bottom: 8px;
+}
+
+.workflow-info strong {
+    color: #2c5282;
+}
+
+/* Buttons */
 .button-group {
     display: flex;
     gap: 15px;
@@ -161,6 +227,7 @@ main {
     display: none;
 }
 
+/* Preview Section */
 .preview-section {
     background-color: white;
     border-radius: 8px;
@@ -214,9 +281,22 @@ main {
     font-weight: 700;
 }
 
+/* Loading Section */
 .loading-section {
     text-align: center;
     padding: 40px;
+}
+
+.loading-section p {
+    color: #2c5282;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.loading-subtext {
+    color: #718096;
+    font-size: 0.9rem;
+    font-weight: normal !important;
 }
 
 .spinner {
@@ -235,6 +315,7 @@ main {
     }
 }
 
+/* Error Section */
 .error-section {
     background-color: #fff5f5;
     border: 1px solid #fc8181;
@@ -244,6 +325,7 @@ main {
     color: #c53030;
 }
 
+/* Success Section */
 .success-section {
     background-color: #f0fff4;
     border: 1px solid #68d391;
@@ -275,6 +357,7 @@ main {
     margin-bottom: 20px;
 }
 
+/* Footer */
 footer {
     text-align: center;
     padding: 20px 0;
@@ -288,6 +371,17 @@ footer p {
     margin-bottom: 5px;
 }
 
+.admin-link {
+    color: #2c5282;
+    text-decoration: none;
+    font-size: 0.8rem;
+}
+
+.admin-link:hover {
+    text-decoration: underline;
+}
+
+/* Responsive */
 @media (max-width: 600px) {
     .container {
         padding: 15px;
@@ -297,8 +391,12 @@ footer p {
         font-size: 1.4rem;
     }
 
+    .upload-row {
+        grid-template-columns: 1fr;
+    }
+
     .upload-box {
-        padding: 30px 15px;
+        padding: 20px 15px;
     }
 
     .button-group {
@@ -307,5 +405,13 @@ footer p {
 
     .btn {
         width: 100%;
+    }
+
+    .workflow-info {
+        padding: 15px;
+    }
+
+    .workflow-info ol {
+        font-size: 0.85rem;
     }
 }

@@ -41,7 +41,62 @@ def get_scenario_list_for_prompt() -> str:
     return "\n".join(lines)
 
 
-def analyze_medical_records(medical_summary: str, patient_info: dict, provider_recommendations: str = "") -> dict:
+def _build_user_causation_section(causation_data: dict) -> str:
+    """
+    Build the causation protocol section using the user's uploaded causation analysis.
+
+    This replaces AI-based causation analysis with the user's predetermined causation determinations.
+    The AI should NOT re-evaluate causation - it should ACCEPT the user's determinations as final.
+    """
+    from app.services.causation_parser import get_causal_body_parts, get_excluded_body_parts
+
+    causal_parts = get_causal_body_parts(causation_data)
+    excluded_parts = get_excluded_body_parts(causation_data)
+
+    causal_list = ", ".join(causal_parts) if causal_parts else "None specified"
+    excluded_list = ", ".join(excluded_parts) if excluded_parts else "None specified"
+
+    # Build exclusion details
+    exclusion_details = []
+    for entry in causation_data.get("excluded_body_parts", []):
+        bp = entry.get("body_part", "Unknown")
+        reason = entry.get("reason", "Not causally related")
+        exclusion_details.append(f"- {bp}: {reason}")
+
+    exclusion_text = "\n".join(exclusion_details) if exclusion_details else "- None specified"
+
+    # Include raw text if parse confidence is low
+    raw_text_section = ""
+    if causation_data.get("parse_confidence") == "low":
+        raw_text = causation_data.get("raw_text", "")[:3000]  # First 3000 chars
+        raw_text_section = f"""
+
+### Note: Low Confidence Parsing
+The causation document could not be fully parsed. Here is the raw text for reference:
+{raw_text}
+"""
+
+    return f"""## USER-PROVIDED CAUSATION ANALYSIS
+
+**CRITICAL: The user has ALREADY performed causation analysis. You must ACCEPT their determinations without re-evaluation.**
+
+### Body Parts CAUSALLY RELATED (Include in LCP):
+{causal_list}
+
+### Body Parts NOT CAUSALLY RELATED (EXCLUDE from LCP):
+{exclusion_text}
+
+### Instructions:
+1. **DO NOT** re-evaluate causation for any diagnosis
+2. **ONLY** assign scenarios to body parts listed as CAUSALLY RELATED
+3. **EXCLUDE** all diagnoses for body parts listed as NOT CAUSALLY RELATED
+4. If a body part is not mentioned in either list, treat it as EXCLUDED (conservative approach)
+5. Include all excluded diagnoses in the "excluded_diagnoses" array with the reason from the causation analysis
+{raw_text_section}
+"""
+
+
+def analyze_medical_records(medical_summary: str, patient_info: dict, provider_recommendations: str = "", causation_data: dict = None) -> dict:
     """
     Phase 1: Analyze medical records and identify applicable scenarios.
 
@@ -49,6 +104,8 @@ def analyze_medical_records(medical_summary: str, patient_info: dict, provider_r
         medical_summary: Text content from the medical records document
         patient_info: Dict with patient name, DOB, life expectancy, etc.
         provider_recommendations: Optional text from treating provider recommendations document
+        causation_data: Optional dict from user's causation analysis document containing
+                       which body parts are causally related vs excluded
 
     Returns:
         Dict with:
@@ -56,15 +113,16 @@ def analyze_medical_records(medical_summary: str, patient_info: dict, provider_r
         - diagnoses: List of identified diagnoses with body parts
         - rationales: Dict mapping scenario code to patient-specific rationale
         - provider_items: List of items directly recommended by treating providers
+        - excluded_diagnoses: List of diagnoses excluded due to causation
         - summary: Brief summary of injuries and care needs
     """
     # Determine which AI provider to use
     provider = get_ai_provider()
 
     if provider == 'gemini':
-        return _analyze_with_gemini(medical_summary, patient_info, provider_recommendations)
+        return _analyze_with_gemini(medical_summary, patient_info, provider_recommendations, causation_data)
     elif provider == 'claude':
-        return _analyze_with_claude(medical_summary, patient_info, provider_recommendations)
+        return _analyze_with_claude(medical_summary, patient_info, provider_recommendations, causation_data)
     else:
         return {
             "error": "No AI API key configured. Set GOOGLE_API_KEY or ANTHROPIC_API_KEY.",
@@ -77,13 +135,19 @@ def analyze_medical_records(medical_summary: str, patient_info: dict, provider_r
         }
 
 
-def _build_prompts(patient_info: dict, medical_summary: str, provider_recommendations: str = ""):
+def _build_prompts(patient_info: dict, medical_summary: str, provider_recommendations: str = "", causation_data: dict = None):
     """Build the system and user prompts for analysis."""
+    from app.services.causation_parser import get_causation_summary, get_causal_body_parts, get_excluded_body_parts
 
     scenario_list = get_scenario_list_for_prompt()
     custom_rules = get_rules_for_analysis()
     knowledge_base = get_knowledge_base_for_prompt()
-    causation_protocol = get_causation_protocol_for_prompt()
+
+    # If user provided causation data, use it instead of AI-based causation
+    if causation_data:
+        causation_protocol = _build_user_causation_section(causation_data)
+    else:
+        causation_protocol = get_causation_protocol_for_prompt()
 
     system_prompt = f"""You are a medical expert assistant helping Dr. William Tontz, MD, CLCP identify applicable clinical scenarios for Life Care Plans.
 
@@ -400,7 +464,7 @@ def _parse_json_response(response_text: str) -> dict:
     }
 
 
-def _analyze_with_gemini(medical_summary: str, patient_info: dict, provider_recommendations: str = "") -> dict:
+def _analyze_with_gemini(medical_summary: str, patient_info: dict, provider_recommendations: str = "", causation_data: dict = None) -> dict:
     """Analyze medical records using Google Gemini."""
     try:
         import google.generativeai as genai
@@ -409,8 +473,8 @@ def _analyze_with_gemini(medical_summary: str, patient_info: dict, provider_reco
         api_key = os.getenv('GOOGLE_API_KEY') or os.getenv('GEMINI_API_KEY')
         genai.configure(api_key=api_key)
 
-        # Build prompts
-        system_prompt, user_prompt = _build_prompts(patient_info, medical_summary, provider_recommendations)
+        # Build prompts (with causation data if provided)
+        system_prompt, user_prompt = _build_prompts(patient_info, medical_summary, provider_recommendations, causation_data)
 
         # Combine system and user prompts for Gemini
         full_prompt = f"{system_prompt}\n\n---\n\n{user_prompt}"
@@ -445,15 +509,15 @@ def _analyze_with_gemini(medical_summary: str, patient_info: dict, provider_reco
         }
 
 
-def _analyze_with_claude(medical_summary: str, patient_info: dict, provider_recommendations: str = "") -> dict:
+def _analyze_with_claude(medical_summary: str, patient_info: dict, provider_recommendations: str = "", causation_data: dict = None) -> dict:
     """Analyze medical records using Anthropic Claude."""
     try:
         from anthropic import Anthropic
 
         client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
 
-        # Build prompts
-        system_prompt, user_prompt = _build_prompts(patient_info, medical_summary, provider_recommendations)
+        # Build prompts (with causation data if provided)
+        system_prompt, user_prompt = _build_prompts(patient_info, medical_summary, provider_recommendations, causation_data)
 
         response = client.messages.create(
             model="claude-sonnet-4-20250514",

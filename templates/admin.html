@@ -390,6 +390,7 @@
     <div class="container">
         <div class="tabs">
             <button class="tab active" onclick="showPanel('rules')">Clinical Rules</button>
+            <button class="tab" onclick="showPanel('scenario-master')">Scenario Master</button>
             <button class="tab" onclick="showPanel('scenarios')">Scenarios</button>
             <button class="tab" onclick="showPanel('knowledge')">Knowledge Base</button>
             <button class="tab" onclick="showPanel('help')">Help & Guide</button>
@@ -427,6 +428,89 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scenario Master Panel -->
+        <div id="scenario-master-panel" class="panel">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Scenario Master System</h2>
+                </div>
+                <div class="card-body">
+                    <p style="margin-bottom: 20px; color: #666;">
+                        Upload your Orthopedic and Spine Scenario Master System document. This defines the
+                        clinical scenarios and their default recommendations that will be used when generating Life Care Plans.
+                    </p>
+
+                    <div style="background: #ebf4ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+                        <h4 style="color: #2c5282; margin-bottom: 10px;">How it works:</h4>
+                        <ol style="margin-left: 20px; color: #2c5282;">
+                            <li>Upload your Scenario Master markdown document (.md file)</li>
+                            <li>The system parses all scenarios (C1, C2, L1, etc.) and their recommendations</li>
+                            <li>Global principles and rules are extracted</li>
+                            <li>During LCP generation, the AI matches diagnoses to these scenarios</li>
+                            <li>Update the document anytime to refine your scenarios</li>
+                        </ol>
+                    </div>
+
+                    <div style="background: #f8fafc; border-radius: 8px; padding: 24px; margin-bottom: 30px;">
+                        <h3 style="margin-bottom: 16px; color: #1a365d;">Upload Scenario Master Document</h3>
+                        <form id="sm-upload-form" onsubmit="uploadScenarioMaster(event)">
+                            <div class="form-group">
+                                <label for="sm-file">Select Markdown Document (.md)</label>
+                                <input type="file" id="sm-file" accept=".md,.txt" required style="padding: 10px;">
+                                <div class="help-text">Upload your "Orthopedic and Spine Scenario Master System" markdown file</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="sm-upload-btn">
+                                Upload & Parse Document
+                            </button>
+                        </form>
+                    </div>
+
+                    <div id="sm-upload-result" style="display: none; margin-bottom: 30px;"></div>
+
+                    <div id="sm-current-status">
+                        <h3 style="margin-bottom: 16px; color: #1a365d;">Current Scenario Master Status</h3>
+                        <div id="sm-status-content" class="loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Loaded Scenarios</h2>
+                    <input type="text" class="search-box" placeholder="Search scenarios..." oninput="filterLoadedScenarios(this.value)">
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Body Region</th>
+                                    <th>Clinical Pattern</th>
+                                    <th>Structural</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sm-scenarios-body">
+                                <tr>
+                                    <td colspan="5" class="loading">Loading scenarios...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Global Rules</h2>
+                </div>
+                <div class="card-body">
+                    <div id="sm-rules-content" class="loading">Loading rules...</div>
                 </div>
             </div>
         </div>
@@ -680,6 +764,9 @@
             loadScenarios();
             loadKnowledgeBase();
             loadKnowledgeBaseHistory();
+            loadScenarioMasterStatus();
+            loadScenarioMasterScenarios();
+            loadScenarioMasterRules();
         });
 
         // Tab switching
@@ -917,6 +1004,230 @@
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
                 event.target.classList.remove('show');
+            }
+        }
+
+        // =============================================================================
+        // SCENARIO MASTER FUNCTIONS
+        // =============================================================================
+
+        let scenarioMasterScenarios = [];
+
+        // Upload scenario master document
+        async function uploadScenarioMaster(event) {
+            event.preventDefault();
+
+            const fileInput = document.getElementById('sm-file');
+            const uploadBtn = document.getElementById('sm-upload-btn');
+            const resultDiv = document.getElementById('sm-upload-result');
+
+            if (!fileInput.files.length) {
+                showAlert('Please select a file', 'error');
+                return;
+            }
+
+            const file = fileInput.files[0];
+
+            // Show loading state
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading & Parsing... (this may take 30-60 seconds)';
+            resultDiv.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/scenario-master/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <h4 style="margin-bottom: 10px;">Scenario Master Uploaded Successfully!</h4>
+                            <p><strong>Document:</strong> ${data.document_name}</p>
+                            <p><strong>Scenarios Parsed:</strong> ${data.scenario_count}</p>
+                            <p><strong>Rules Parsed:</strong> ${data.rule_count}</p>
+                            <p><strong>Recommendations:</strong> ${data.recommendation_count || 0}</p>
+                        </div>
+                    `;
+                    resultDiv.style.display = 'block';
+
+                    showAlert('Scenario Master updated successfully!');
+
+                    // Reload data
+                    loadScenarioMasterStatus();
+                    loadScenarioMasterScenarios();
+                    loadScenarioMasterRules();
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-error">
+                            <h4>Upload Failed</h4>
+                            <p>${data.error || 'Unknown error occurred'}</p>
+                        </div>
+                    `;
+                    resultDiv.style.display = 'block';
+                    showAlert(data.error || 'Failed to upload document', 'error');
+                }
+            } catch (error) {
+                console.error('Error uploading scenario master:', error);
+                resultDiv.innerHTML = `
+                    <div class="alert alert-error">
+                        <h4>Upload Failed</h4>
+                        <p>Network error: ${error.message}</p>
+                    </div>
+                `;
+                resultDiv.style.display = 'block';
+                showAlert('Failed to upload document', 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload & Parse Document';
+            }
+        }
+
+        // Load scenario master status
+        async function loadScenarioMasterStatus() {
+            const statusContent = document.getElementById('sm-status-content');
+
+            try {
+                const response = await fetch('/api/scenario-master/status');
+                const data = await response.json();
+
+                if (data.loaded) {
+                    const date = data.parsed_at ? new Date(data.parsed_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }) : 'Unknown';
+
+                    statusContent.innerHTML = `
+                        <div style="background: #e6fffa; border: 1px solid #81e6d9; border-radius: 8px; padding: 20px;">
+                            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                                <span style="color: #38a169; font-size: 24px; margin-right: 10px;">●</span>
+                                <strong style="color: #234e52; font-size: 18px;">Scenario Master Loaded</strong>
+                            </div>
+                            <p><strong>Document:</strong> ${data.document_name || 'N/A'}</p>
+                            <p><strong>Scenarios:</strong> ${data.scenario_count}</p>
+                            <p><strong>Global Rules:</strong> ${data.rule_count}</p>
+                            <p><strong>Last Updated:</strong> ${date}</p>
+                        </div>
+                    `;
+                } else {
+                    statusContent.innerHTML = `
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; text-align: center;">
+                            <p style="color: #718096; margin-bottom: 10px;">No Scenario Master uploaded yet.</p>
+                            <p style="color: #a0aec0;">Upload your Scenario Master document above to define your clinical scenarios.</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading scenario master status:', error);
+                statusContent.innerHTML = `
+                    <div style="background: #fff5f5; border: 1px solid #fc8181; border-radius: 8px; padding: 20px;">
+                        <p style="color: #c53030;">Could not load Scenario Master status. Make sure Supabase is configured.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Load scenario master scenarios
+        async function loadScenarioMasterScenarios() {
+            const tbody = document.getElementById('sm-scenarios-body');
+
+            try {
+                const response = await fetch('/api/scenario-master/scenarios');
+                const data = await response.json();
+                scenarioMasterScenarios = data.scenarios || [];
+
+                renderScenarioMasterScenarios();
+            } catch (error) {
+                console.error('Error loading scenarios:', error);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" style="color: #c53030;">Could not load scenarios.</td>
+                    </tr>
+                `;
+            }
+        }
+
+        // Render scenario master scenarios table
+        function renderScenarioMasterScenarios(filter = '') {
+            const tbody = document.getElementById('sm-scenarios-body');
+            const filtered = scenarioMasterScenarios.filter(s =>
+                !filter ||
+                s.scenario_code.toLowerCase().includes(filter.toLowerCase()) ||
+                s.scenario_name.toLowerCase().includes(filter.toLowerCase()) ||
+                (s.body_region && s.body_region.toLowerCase().includes(filter.toLowerCase()))
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="empty-state">
+                            <p>No scenarios loaded yet. Upload a Scenario Master document above.</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(s => `
+                <tr>
+                    <td><strong>${s.scenario_code}</strong></td>
+                    <td>${s.scenario_name}</td>
+                    <td><span class="badge badge-green">${s.body_region || 'N/A'}</span></td>
+                    <td style="max-width: 300px;">${truncate(s.clinical_pattern, 100)}</td>
+                    <td>${s.is_structural ? '<span class="status-active">Yes</span>' : '<span class="status-inactive">No</span>'}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Filter loaded scenarios
+        function filterLoadedScenarios(value) {
+            renderScenarioMasterScenarios(value);
+        }
+
+        // Load scenario master global rules
+        async function loadScenarioMasterRules() {
+            const rulesContent = document.getElementById('sm-rules-content');
+
+            try {
+                const response = await fetch('/api/scenario-master/rules');
+                const data = await response.json();
+                const rules = data.rules || [];
+
+                if (rules.length === 0) {
+                    rulesContent.innerHTML = `
+                        <p style="color: #718096; text-align: center;">No global rules loaded yet.</p>
+                    `;
+                    return;
+                }
+
+                rulesContent.innerHTML = `
+                    <div style="background: #f8fafc; border-radius: 8px; padding: 16px;">
+                        ${rules.map((rule, index) => `
+                            <div style="padding: 12px 0; ${index < rules.length - 1 ? 'border-bottom: 1px solid #e2e8f0;' : ''}">
+                                <div style="display: flex; align-items: flex-start;">
+                                    <span style="background: #2c5282; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 12px;">${rule.rule_number}</span>
+                                    <div>
+                                        <p style="margin: 0;">${rule.rule_text}</p>
+                                        ${rule.rule_type !== 'general' ? `<span class="badge badge-blue" style="margin-top: 8px;">${rule.rule_type}</span>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading rules:', error);
+                rulesContent.innerHTML = `
+                    <p style="color: #c53030;">Could not load global rules.</p>
+                `;
             }
         }
 

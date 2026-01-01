@@ -15,30 +15,58 @@
 
         <main>
             <form id="uploadForm" enctype="multipart/form-data">
-                <div class="upload-section">
-                    <div class="upload-box" id="workbookDropZone">
-                        <div class="upload-icon">📁</div>
-                        <p class="upload-text">Drop Master Workbook here (.xlsm/.xlsx)</p>
-                        <p class="upload-subtext">or click to browse</p>
-                        <input type="file" id="workbookFile" name="file" accept=".xlsx,.xlsm" hidden>
-                        <p class="file-name" id="workbookFileName"></p>
+                <div class="upload-grid">
+                    <!-- Row 1: Required Documents -->
+                    <div class="upload-row">
+                        <div class="upload-box primary" id="workbookDropZone">
+                            <div class="upload-badge required">Required</div>
+                            <div class="upload-icon">📊</div>
+                            <p class="upload-text">Master Workbook</p>
+                            <p class="upload-subtext">(.xlsm/.xlsx) - Fee schedules &amp; patient info</p>
+                            <input type="file" id="workbookFile" name="file" accept=".xlsx,.xlsm" hidden>
+                            <p class="file-name" id="workbookFileName"></p>
+                        </div>
+
+                        <div class="upload-box primary" id="causationDropZone">
+                            <div class="upload-badge required">Required</div>
+                            <div class="upload-icon">⚖️</div>
+                            <p class="upload-text">Causation Analysis</p>
+                            <p class="upload-subtext">(.docx/.pdf) - Your causation determinations</p>
+                            <input type="file" id="causationFile" name="causation_analysis" accept=".docx,.pdf" hidden>
+                            <p class="file-name" id="causationFileName"></p>
+                        </div>
                     </div>
 
-                    <div class="upload-box secondary" id="summaryDropZone">
-                        <div class="upload-icon">📄</div>
-                        <p class="upload-text">Drop Medical Summary here (.docx)</p>
-                        <p class="upload-subtext">AI-powered item selection</p>
-                        <input type="file" id="summaryFile" name="medical_summary" accept=".docx" hidden>
-                        <p class="file-name" id="summaryFileName"></p>
-                    </div>
+                    <!-- Row 2: Medical Summary (Required) and Provider Recommendations (Optional) -->
+                    <div class="upload-row">
+                        <div class="upload-box primary" id="summaryDropZone">
+                            <div class="upload-badge required">Required</div>
+                            <div class="upload-icon">📋</div>
+                            <p class="upload-text">Medical Summary</p>
+                            <p class="upload-subtext">(.docx/.pdf) - Treatment history for scenario matching</p>
+                            <input type="file" id="summaryFile" name="medical_summary" accept=".docx,.pdf" hidden>
+                            <p class="file-name" id="summaryFileName"></p>
+                        </div>
 
-                    <div class="upload-box tertiary" id="providerDropZone">
-                        <div class="upload-icon">👨‍⚕️</div>
-                        <p class="upload-text">Drop Provider Recommendations here (.docx)</p>
-                        <p class="upload-subtext">Optional - Treating physician recommendations</p>
-                        <input type="file" id="providerFile" name="provider_recommendations" accept=".docx" hidden>
-                        <p class="file-name" id="providerFileName"></p>
+                        <div class="upload-box secondary" id="providerDropZone">
+                            <div class="upload-badge optional">Optional</div>
+                            <div class="upload-icon">👨‍⚕️</div>
+                            <p class="upload-text">Provider Recommendations</p>
+                            <p class="upload-subtext">(.docx/.pdf) - Treating physician frequencies</p>
+                            <input type="file" id="providerFile" name="provider_recommendations" accept=".docx,.pdf" hidden>
+                            <p class="file-name" id="providerFileName"></p>
+                        </div>
                     </div>
+                </div>
+
+                <div class="workflow-info">
+                    <h3>How it works:</h3>
+                    <ol>
+                        <li><strong>Master Workbook</strong> - Contains fee schedules (PFR/APC) and patient demographics</li>
+                        <li><strong>Causation Analysis</strong> - Your determinations of which diagnoses are causally related to the injury</li>
+                        <li><strong>Medical Summary</strong> - Treatment history used to match appropriate clinical scenarios</li>
+                        <li><strong>Provider Recommendations</strong> (optional) - Treating physician frequencies override defaults</li>
+                    </ol>
                 </div>
 
                 <div class="button-group">
@@ -55,7 +83,8 @@
 
             <div id="loadingSection" class="loading-section hidden">
                 <div class="spinner"></div>
-                <p>Generating LCP Recommendations...</p>
+                <p id="loadingMessage">Generating LCP Recommendations...</p>
+                <p class="loading-subtext">Analyzing medical records and matching scenarios...</p>
             </div>
 
             <div id="errorSection" class="error-section hidden">
@@ -75,6 +104,7 @@
         <footer>
             <p>Precision Life Care Planning</p>
             <p>William Tontz, Jr., MD, CLCP</p>
+            <a href="/admin" class="admin-link">Admin Panel</a>
         </footer>
     </div>
 

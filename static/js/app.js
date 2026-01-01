@@ -3,6 +3,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const workbookDropZone = document.getElementById('workbookDropZone');
     const workbookFile = document.getElementById('workbookFile');
     const workbookFileName = document.getElementById('workbookFileName');
+    const causationDropZone = document.getElementById('causationDropZone');
+    const causationFile = document.getElementById('causationFile');
+    const causationFileName = document.getElementById('causationFileName');
     const summaryDropZone = document.getElementById('summaryDropZone');
     const summaryFile = document.getElementById('summaryFile');
     const summaryFileName = document.getElementById('summaryFileName');
@@ -17,13 +20,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const successSection = document.getElementById('successSection');
     const resetBtn = document.getElementById('resetBtn');
 
-    // Drop zone handlers for workbook
+    // Drop zone handlers for all upload boxes
     setupDropZone(workbookDropZone, workbookFile, workbookFileName, ['xlsx', 'xlsm']);
-    setupDropZone(summaryDropZone, summaryFile, summaryFileName, ['docx']);
-    setupDropZone(providerDropZone, providerFile, providerFileName, ['docx']);
+    setupDropZone(causationDropZone, causationFile, causationFileName, ['docx', 'pdf']);
+    setupDropZone(summaryDropZone, summaryFile, summaryFileName, ['docx', 'pdf']);
+    setupDropZone(providerDropZone, providerFile, providerFileName, ['docx', 'pdf']);
 
     // Click to select file
     workbookDropZone.addEventListener('click', () => workbookFile.click());
+    causationDropZone.addEventListener('click', () => causationFile.click());
     summaryDropZone.addEventListener('click', () => summaryFile.click());
     providerDropZone.addEventListener('click', () => providerFile.click());
 
@@ -33,8 +38,14 @@ document.addEventListener('DOMContentLoaded', function() {
         updateButtons();
     });
 
+    causationFile.addEventListener('change', function() {
+        updateFileName(this, causationFileName, causationDropZone);
+        updateButtons();
+    });
+
     summaryFile.addEventListener('change', function() {
         updateFileName(this, summaryFileName, summaryDropZone);
+        updateButtons();
     });
 
     providerFile.addEventListener('change', function() {
@@ -76,25 +87,33 @@ document.addEventListener('DOMContentLoaded', function() {
     uploadForm.addEventListener('submit', async function(e) {
         e.preventDefault();
 
-        if (!workbookFile.files[0]) return;
+        // Validate required files
+        if (!workbookFile.files[0]) {
+            showError('Please upload the Master Workbook');
+            return;
+        }
+        if (!causationFile.files[0]) {
+            showError('Please upload the Causation Analysis document');
+            return;
+        }
+        if (!summaryFile.files[0]) {
+            showError('Please upload the Medical Summary document');
+            return;
+        }
 
         hideAllSections();
         loadingSection.classList.remove('hidden');
 
-        // Update loading message based on AI mode
-        const loadingText = loadingSection.querySelector('p');
-        if (summaryFile.files[0] || providerFile.files[0]) {
-            loadingText.textContent = 'Analyzing medical records with AI and generating recommendations...';
-        } else {
-            loadingText.textContent = 'Generating LCP Recommendations...';
+        // Update loading message
+        const loadingMessage = document.getElementById('loadingMessage');
+        if (loadingMessage) {
+            loadingMessage.textContent = 'Analyzing causation and matching clinical scenarios...';
         }
 
         const formData = new FormData();
         formData.append('file', workbookFile.files[0]);
-
-        if (summaryFile.files[0]) {
-            formData.append('medical_summary', summaryFile.files[0]);
-        }
+        formData.append('causation_analysis', causationFile.files[0]);
+        formData.append('medical_summary', summaryFile.files[0]);
 
         if (providerFile.files[0]) {
             formData.append('provider_recommendations', providerFile.files[0]);
@@ -122,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     // Server returned HTML (error page) - provide helpful message
                     if (response.status === 504 || response.status === 502) {
-                        throw new Error('Request timed out. The AI analysis is taking too long. Please try again or use a shorter medical summary.');
+                        throw new Error('Request timed out. The analysis is taking too long. Please try again or use shorter documents.');
                     } else if (response.status >= 500) {
                         throw new Error('Server error occurred. Please check Render logs or try again.');
                     } else {
@@ -157,7 +176,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         } catch (error) {
             if (error.name === 'AbortError') {
-                showError('Request timed out after 3 minutes. Please try with a shorter medical summary.');
+                showError('Request timed out after 3 minutes. Please try with shorter documents.');
             } else {
                 showError(error.message);
             }
@@ -168,9 +187,11 @@ document.addEventListener('DOMContentLoaded', function() {
     resetBtn.addEventListener('click', function() {
         uploadForm.reset();
         workbookFileName.textContent = '';
+        causationFileName.textContent = '';
         summaryFileName.textContent = '';
         providerFileName.textContent = '';
         workbookDropZone.classList.remove('has-file');
+        causationDropZone.classList.remove('has-file');
         summaryDropZone.classList.remove('has-file');
         providerDropZone.classList.remove('has-file');
         hideAllSections();
@@ -222,9 +243,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateButtons() {
-        const hasFile = workbookFile.files && workbookFile.files[0];
-        previewBtn.disabled = !hasFile;
-        generateBtn.disabled = !hasFile;
+        // All three required files must be present to enable generate
+        const hasWorkbook = workbookFile.files && workbookFile.files[0];
+        const hasCausation = causationFile.files && causationFile.files[0];
+        const hasSummary = summaryFile.files && summaryFile.files[0];
+
+        previewBtn.disabled = !hasWorkbook;
+        generateBtn.disabled = !(hasWorkbook && hasCausation && hasSummary);
     }
 
     function hideAllSections() {
