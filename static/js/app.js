@@ -101,14 +101,34 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
+            // Create AbortController for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minute timeout
+
             const response = await fetch('/api/generate', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                signal: controller.signal
             });
 
+            clearTimeout(timeoutId);
+
             if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Generation failed');
+                // Try to parse as JSON, but handle HTML error pages
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Generation failed');
+                } else {
+                    // Server returned HTML (error page) - provide helpful message
+                    if (response.status === 504 || response.status === 502) {
+                        throw new Error('Request timed out. The AI analysis is taking too long. Please try again or use a shorter medical summary.');
+                    } else if (response.status >= 500) {
+                        throw new Error('Server error occurred. Please check Render logs or try again.');
+                    } else {
+                        throw new Error(`Request failed with status ${response.status}`);
+                    }
+                }
             }
 
             // Download the file
@@ -136,7 +156,11 @@ document.addEventListener('DOMContentLoaded', function() {
             showSuccess(filename);
 
         } catch (error) {
-            showError(error.message);
+            if (error.name === 'AbortError') {
+                showError('Request timed out after 3 minutes. Please try with a shorter medical summary.');
+            } else {
+                showError(error.message);
+            }
         }
     });
 
