@@ -53,8 +53,6 @@ def _build_user_causation_section(causation_data: dict) -> str:
     causal_parts = get_causal_body_parts(causation_data)
     excluded_parts = get_excluded_body_parts(causation_data)
 
-    causal_list = ", ".join(causal_parts) if causal_parts else "None specified"
-
     # Build exclusion details
     exclusion_details = []
     for entry in causation_data.get("excluded_body_parts", []):
@@ -62,40 +60,45 @@ def _build_user_causation_section(causation_data: dict) -> str:
         reason = entry.get("reason", "Not causally related")
         exclusion_details.append(f"- **{bp}**: {reason}")
 
-    exclusion_text = "\n".join(exclusion_details) if exclusion_details else "- None specified"
+    exclusion_text = "\n".join(exclusion_details) if exclusion_details else "- None identified"
 
     # Always include raw text so AI can see the full causation analysis
     raw_text = causation_data.get("raw_text", "")[:4000]  # First 4000 chars
 
-    return f"""## USER-PROVIDED CAUSATION ANALYSIS - MANDATORY COMPLIANCE
+    # Different instructions depending on what was found
+    if causal_parts:
+        causal_instruction = f"""### Body Parts CAUSALLY RELATED (You MAY include scenarios for these):
+{", ".join(causal_parts)}"""
+    else:
+        causal_instruction = """### Body Parts CAUSALLY RELATED:
+The causation document did not explicitly list causal body parts.
+You should analyze the medical summary and include scenarios for any structural diagnoses
+EXCEPT those explicitly listed as excluded below."""
 
-###############################################################################
-# CRITICAL: YOU MUST FOLLOW THESE CAUSATION DETERMINATIONS EXACTLY           #
-# THE USER HAS ALREADY PERFORMED CAUSATION ANALYSIS - DO NOT OVERRIDE IT     #
-###############################################################################
+    return f"""## USER-PROVIDED CAUSATION ANALYSIS
 
-### Body Parts CAUSALLY RELATED (You MAY include scenarios for these):
-{causal_list}
+The user has performed causation analysis. You must respect their exclusion determinations.
 
-### Body Parts NOT CAUSALLY RELATED (You MUST EXCLUDE these - NO EXCEPTIONS):
+{causal_instruction}
+
+### Body Parts EXPLICITLY EXCLUDED (You MUST NOT include these - NO EXCEPTIONS):
 {exclusion_text}
 
-### MANDATORY RULES - VIOLATION IS NOT ACCEPTABLE:
-1. **NEVER** assign scenarios to body parts listed as NOT CAUSALLY RELATED
-2. **NEVER** include knee scenarios (K1-K8) if knee is listed as excluded
-3. **NEVER** include shoulder scenarios (S1-S6) if shoulder is listed as excluded
-4. **NEVER** include any recommendations for excluded body parts
-5. If you see ANY diagnosis for an excluded body part, put it in "excluded_diagnoses" - NOT in scenarios
-6. The user's causation analysis is FINAL - do not re-evaluate or override it
+### MANDATORY EXCLUSION RULES:
+1. **NEVER** assign scenarios to body parts listed above as EXCLUDED
+2. If "Right Knee" or "Knee" is excluded: Do NOT include K1, K2, K3, K4, K5, K6, K7, or K8
+3. If "Shoulder" is excluded: Do NOT include S1, S2, S3, S4, S5, or S6
+4. If "Hip" is excluded: Do NOT include H1, H2, H3, H4, H5, or H6
+5. Any diagnosis for an excluded body part goes in "excluded_diagnoses" array
+6. Body parts NOT in the exclusion list above may be included if the medical summary supports it
 
-### Raw Causation Analysis Document:
+### Raw Causation Analysis Document (for reference):
 ```
 {raw_text}
 ```
 
-### BEFORE YOU OUTPUT:
-Double-check: Did you include any scenarios for excluded body parts? If yes, REMOVE THEM.
-For each scenario you output, verify the body part is NOT in the exclusion list above.
+### VERIFICATION STEP:
+Before finalizing, check each scenario code against the exclusion list above.
 """
 
 
