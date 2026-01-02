@@ -54,45 +54,48 @@ def _build_user_causation_section(causation_data: dict) -> str:
     excluded_parts = get_excluded_body_parts(causation_data)
 
     causal_list = ", ".join(causal_parts) if causal_parts else "None specified"
-    excluded_list = ", ".join(excluded_parts) if excluded_parts else "None specified"
 
     # Build exclusion details
     exclusion_details = []
     for entry in causation_data.get("excluded_body_parts", []):
         bp = entry.get("body_part", "Unknown")
         reason = entry.get("reason", "Not causally related")
-        exclusion_details.append(f"- {bp}: {reason}")
+        exclusion_details.append(f"- **{bp}**: {reason}")
 
     exclusion_text = "\n".join(exclusion_details) if exclusion_details else "- None specified"
 
-    # Include raw text if parse confidence is low
-    raw_text_section = ""
-    if causation_data.get("parse_confidence") == "low":
-        raw_text = causation_data.get("raw_text", "")[:3000]  # First 3000 chars
-        raw_text_section = f"""
+    # Always include raw text so AI can see the full causation analysis
+    raw_text = causation_data.get("raw_text", "")[:4000]  # First 4000 chars
 
-### Note: Low Confidence Parsing
-The causation document could not be fully parsed. Here is the raw text for reference:
-{raw_text}
-"""
+    return f"""## USER-PROVIDED CAUSATION ANALYSIS - MANDATORY COMPLIANCE
 
-    return f"""## USER-PROVIDED CAUSATION ANALYSIS
+###############################################################################
+# CRITICAL: YOU MUST FOLLOW THESE CAUSATION DETERMINATIONS EXACTLY           #
+# THE USER HAS ALREADY PERFORMED CAUSATION ANALYSIS - DO NOT OVERRIDE IT     #
+###############################################################################
 
-**CRITICAL: The user has ALREADY performed causation analysis. You must ACCEPT their determinations without re-evaluation.**
-
-### Body Parts CAUSALLY RELATED (Include in LCP):
+### Body Parts CAUSALLY RELATED (You MAY include scenarios for these):
 {causal_list}
 
-### Body Parts NOT CAUSALLY RELATED (EXCLUDE from LCP):
+### Body Parts NOT CAUSALLY RELATED (You MUST EXCLUDE these - NO EXCEPTIONS):
 {exclusion_text}
 
-### Instructions:
-1. **DO NOT** re-evaluate causation for any diagnosis
-2. **ONLY** assign scenarios to body parts listed as CAUSALLY RELATED
-3. **EXCLUDE** all diagnoses for body parts listed as NOT CAUSALLY RELATED
-4. If a body part is not mentioned in either list, treat it as EXCLUDED (conservative approach)
-5. Include all excluded diagnoses in the "excluded_diagnoses" array with the reason from the causation analysis
-{raw_text_section}
+### MANDATORY RULES - VIOLATION IS NOT ACCEPTABLE:
+1. **NEVER** assign scenarios to body parts listed as NOT CAUSALLY RELATED
+2. **NEVER** include knee scenarios (K1-K8) if knee is listed as excluded
+3. **NEVER** include shoulder scenarios (S1-S6) if shoulder is listed as excluded
+4. **NEVER** include any recommendations for excluded body parts
+5. If you see ANY diagnosis for an excluded body part, put it in "excluded_diagnoses" - NOT in scenarios
+6. The user's causation analysis is FINAL - do not re-evaluate or override it
+
+### Raw Causation Analysis Document:
+```
+{raw_text}
+```
+
+### BEFORE YOU OUTPUT:
+Double-check: Did you include any scenarios for excluded body parts? If yes, REMOVE THEM.
+For each scenario you output, verify the body part is NOT in the exclusion list above.
 """
 
 
@@ -428,7 +431,7 @@ Remember: Only include scenarios for STRUCTURAL injuries. Sprains/strains get NO
     return system_prompt, user_prompt
 
 
-def _parse_json_response(response_text: str) -> dict:
+def _parse_json_response(response_text: str, causation_data: dict = None) -> dict:
     """Parse JSON from AI response, handling various formats."""
     json_text = response_text
 
@@ -453,15 +456,79 @@ def _parse_json_response(response_text: str) -> dict:
 
     result = json.loads(json_text)
 
+    scenarios = result.get("scenarios", [])
+    rationales = result.get("rationales", {})
+    excluded_diagnoses = result.get("excluded_diagnoses", [])
+
+    # SAFETY NET: If causation data provided, filter out any scenarios for excluded body parts
+    if causation_data:
+        scenarios, rationales, additional_excluded = _filter_excluded_scenarios(
+            scenarios, rationales, causation_data
+        )
+        # Add any AI-included scenarios that should have been excluded
+        excluded_diagnoses.extend(additional_excluded)
+
     return {
-        "scenarios": result.get("scenarios", []),
+        "scenarios": scenarios,
         "diagnoses": result.get("diagnoses", []),
-        "excluded_diagnoses": result.get("excluded_diagnoses", []),
-        "rationales": result.get("rationales", {}),
+        "excluded_diagnoses": excluded_diagnoses,
+        "rationales": rationales,
         "provider_items": result.get("provider_items", []),
         "summary": result.get("summary", ""),
         "error": None
     }
+
+
+def _filter_excluded_scenarios(scenarios: list, rationales: dict, causation_data: dict) -> tuple:
+    """
+    Safety net: Remove any scenarios for body parts that should be excluded.
+    Returns (filtered_scenarios, filtered_rationales, additional_excluded_diagnoses)
+    """
+    from app.services.causation_parser import get_excluded_body_parts
+
+    excluded_body_parts = [bp.lower() for bp in get_excluded_body_parts(causation_data)]
+
+    # Map scenario prefixes to body parts
+    scenario_body_map = {
+        'C': ['cervical', 'cervical spine'],
+        'T': ['thoracic', 'thoracic spine'],
+        'L': ['lumbar', 'lumbar spine'],
+        'S': ['shoulder', 'right shoulder', 'left shoulder'],
+        'E': ['elbow', 'right elbow', 'left elbow'],
+        'W': ['wrist', 'right wrist', 'left wrist', 'hand', 'right hand', 'left hand'],
+        'H': ['hip', 'right hip', 'left hip'],
+        'K': ['knee', 'right knee', 'left knee'],
+        'F': ['ankle', 'right ankle', 'left ankle', 'foot', 'right foot', 'left foot'],
+    }
+
+    filtered_scenarios = []
+    filtered_rationales = {}
+    additional_excluded = []
+
+    for scenario in scenarios:
+        prefix = scenario[0] if scenario else ''
+        body_parts_for_scenario = scenario_body_map.get(prefix, [])
+
+        # Check if any of this scenario's body parts are excluded
+        is_excluded = any(
+            bp in excluded_body_parts or any(ebp in bp for ebp in excluded_body_parts)
+            for bp in body_parts_for_scenario
+        )
+
+        if is_excluded:
+            # This scenario should not have been included - add to excluded list
+            additional_excluded.append({
+                "body_part": body_parts_for_scenario[0].title() if body_parts_for_scenario else "Unknown",
+                "diagnosis": f"Scenario {scenario}",
+                "causation": "not_causal",
+                "reason": "Body part excluded per user's causation analysis - removed by safety filter"
+            })
+        else:
+            filtered_scenarios.append(scenario)
+            if scenario in rationales:
+                filtered_rationales[scenario] = rationales[scenario]
+
+    return filtered_scenarios, filtered_rationales, additional_excluded
 
 
 def _analyze_with_gemini(medical_summary: str, patient_info: dict, provider_recommendations: str = "", causation_data: dict = None) -> dict:
@@ -484,7 +551,7 @@ def _analyze_with_gemini(medical_summary: str, patient_info: dict, provider_reco
         response = model.generate_content(full_prompt)
 
         response_text = response.text
-        return _parse_json_response(response_text)
+        return _parse_json_response(response_text, causation_data)
 
     except json.JSONDecodeError as e:
         return {
@@ -529,7 +596,7 @@ def _analyze_with_claude(medical_summary: str, patient_info: dict, provider_reco
         )
 
         response_text = response.content[0].text
-        return _parse_json_response(response_text)
+        return _parse_json_response(response_text, causation_data)
 
     except json.JSONDecodeError as e:
         return {

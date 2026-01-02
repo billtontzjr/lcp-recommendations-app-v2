@@ -112,14 +112,42 @@ def parse_causation_text(text: str) -> dict:
         "right foot", "left foot", "foot"
     ]
 
-    # Classification keywords
+    # Classification keywords - expanded for better matching
     causal_keywords = ["causal", "causally related", "caused by", "resulted from",
-                       "directly caused", "result of the"]
+                       "directly caused", "result of the", "related to the injury",
+                       "related to the accident", "meets causation", "causation established"]
     aggravation_keywords = ["aggravation", "aggravated", "permanent worsening",
-                           "permanently worsened"]
-    excluded_keywords = ["not causal", "not causally related", "excluded",
+                           "permanently worsened", "aggravated by"]
+    excluded_keywords = ["not causal", "not causally related", "excluded", "not related",
                         "no causal relationship", "pre-existing", "unrelated",
-                        "exacerbation", "sprain", "strain", "self-limited"]
+                        "exacerbation", "sprain", "strain", "self-limited",
+                        "does not meet", "fails to meet", "no relationship",
+                        "not attributable", "unrelated to", "independent of"]
+
+    # FIRST PASS: Look for explicit exclusion patterns with body parts
+    # This catches patterns like "right knee is not related" or "right knee: not causal"
+    exclusion_patterns = [
+        r'(right|left)?\s*(knee|shoulder|hip|elbow|wrist|ankle|foot|cervical|thoracic|lumbar)[^.]*(?:not\s+(?:causal|related)|excluded|unrelated|no\s+(?:causal\s+)?relationship)',
+        r'(?:not\s+(?:causal|related)|excluded|unrelated)[^.]*?(right|left)?\s*(knee|shoulder|hip|elbow|wrist|ankle|foot|cervical|thoracic|lumbar)',
+        r'(right|left)?\s*(knee|shoulder|hip|elbow|wrist|ankle|foot)[^.]*(?:pre-?existing|prior\s+to)',
+    ]
+
+    for pattern in exclusion_patterns:
+        matches = re.finditer(pattern, text_lower, re.IGNORECASE)
+        for match in matches:
+            matched_text = match.group(0)
+            # Extract body part from match
+            for bp in body_parts:
+                if bp.lower() in matched_text:
+                    normalized_bp = normalize_body_part(bp)
+                    # Check if not already in excluded list
+                    if not any(e.get("body_part") == normalized_bp for e in result["excluded_body_parts"]):
+                        result["excluded_body_parts"].append({
+                            "body_part": normalized_bp,
+                            "classification": "not_causal",
+                            "reason": f"Excluded per causation analysis: {matched_text[:100]}",
+                            "section_context": matched_text
+                        })
 
     # Try to find sections in the document
     sections = split_into_sections(text)
