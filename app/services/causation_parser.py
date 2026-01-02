@@ -112,85 +112,101 @@ def parse_causation_text(text: str) -> dict:
         "right foot", "left foot", "foot"
     ]
 
-    # Classification keywords - expanded for better matching
-    causal_keywords = ["causal", "causally related", "caused by", "resulted from",
-                       "directly caused", "result of the", "related to the injury",
-                       "related to the accident", "meets causation", "causation established"]
-    aggravation_keywords = ["aggravation", "aggravated", "permanent worsening",
-                           "permanently worsened", "aggravated by"]
-    excluded_keywords = ["not causal", "not causally related", "excluded", "not related",
-                        "no causal relationship", "pre-existing", "unrelated",
-                        "exacerbation", "sprain", "strain", "self-limited",
-                        "does not meet", "fails to meet", "no relationship",
-                        "not attributable", "unrelated to", "independent of"]
-
-    # FIRST PASS: Look for explicit exclusion patterns with body parts
-    # This catches patterns like "right knee is not related" or "right knee: not causal"
-    exclusion_patterns = [
-        r'(right|left)?\s*(knee|shoulder|hip|elbow|wrist|ankle|foot|cervical|thoracic|lumbar)[^.]*(?:not\s+(?:causal|related)|excluded|unrelated|no\s+(?:causal\s+)?relationship)',
-        r'(?:not\s+(?:causal|related)|excluded|unrelated)[^.]*?(right|left)?\s*(knee|shoulder|hip|elbow|wrist|ankle|foot|cervical|thoracic|lumbar)',
-        r'(right|left)?\s*(knee|shoulder|hip|elbow|wrist|ankle|foot)[^.]*(?:pre-?existing|prior\s+to)',
+    # LOOK FOR EXPLICIT EXCLUSION SECTIONS ONLY
+    # These are section headers that explicitly list excluded conditions
+    exclusion_section_patterns = [
+        r'(?:conditions?\s+)?(?:not\s+included|excluded)(?:\s+(?:in|from))?\s+(?:causation|lcp|opinion)',
+        r'(?:conditions?\s+)?excluded\s+from\s+causation',
+        r'unable\s+to\s+render\s+(?:an?\s+)?opinion',
+        r'excluded\s+from\s+(?:this\s+)?(?:causation\s+)?opinion',
     ]
 
-    for pattern in exclusion_patterns:
-        matches = re.finditer(pattern, text_lower, re.IGNORECASE)
+    # Find exclusion section
+    exclusion_section_start = -1
+    for pattern in exclusion_section_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            exclusion_section_start = match.start()
+            break
+
+    # If we found an exclusion section, look for body parts within it
+    if exclusion_section_start >= 0:
+        # Get text from exclusion section to end (or next major section)
+        exclusion_text = text_lower[exclusion_section_start:]
+        # Limit to reasonable section size (next 2000 chars or until SUMMARY/METHODS)
+        next_section = re.search(r'\n(?:summary|methods|bibliography|conclusion)', exclusion_text[100:])
+        if next_section:
+            exclusion_text = exclusion_text[:100 + next_section.start()]
+        else:
+            exclusion_text = exclusion_text[:2000]
+
+        # Find body parts mentioned in the exclusion section
+        for bp in body_parts:
+            if bp.lower() in exclusion_text:
+                normalized_bp = normalize_body_part(bp)
+                if not any(e.get("body_part") == normalized_bp for e in result["excluded_body_parts"]):
+                    result["excluded_body_parts"].append({
+                        "body_part": normalized_bp,
+                        "classification": "not_causal",
+                        "reason": "Listed in 'Conditions Excluded from Causation Opinion' section",
+                        "section_context": exclusion_text[:500]
+                    })
+
+    # Also look for explicit "unable to render opinion" statements
+    unable_patterns = [
+        r'unable\s+to\s+render\s+(?:an?\s+)?(?:causation\s+)?opinion[^.]*?(right|left)?\s*(knee|shoulder|hip|elbow|wrist|ankle|foot)',
+        r'(right|left)?\s*(knee|shoulder|hip|elbow|wrist|ankle|foot)[^.]*unable\s+to\s+render',
+    ]
+
+    for pattern in unable_patterns:
+        matches = re.finditer(pattern, text_lower)
         for match in matches:
             matched_text = match.group(0)
-            # Extract body part from match
             for bp in body_parts:
                 if bp.lower() in matched_text:
                     normalized_bp = normalize_body_part(bp)
-                    # Check if not already in excluded list
                     if not any(e.get("body_part") == normalized_bp for e in result["excluded_body_parts"]):
                         result["excluded_body_parts"].append({
                             "body_part": normalized_bp,
                             "classification": "not_causal",
-                            "reason": f"Excluded per causation analysis: {matched_text[:100]}",
-                            "section_context": matched_text
+                            "reason": "Unable to render causation opinion per analysis",
+                            "section_context": matched_text[:200]
                         })
 
-    # Try to find sections in the document
-    sections = split_into_sections(text)
+    # LOOK FOR CAUSAL SECTIONS - "causally related" or "new traumatic conditions"
+    causal_section_patterns = [
+        r'(?:causally\s+related|new\s+traumatic\s+conditions?|permanent\s+aggravations?)',
+        r'summary\s+of\s+causation\s+opinions?',
+    ]
 
-    for section_title, section_text in sections.items():
-        section_lower = section_text.lower()
+    for pattern in causal_section_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            # Get surrounding context
+            start = max(0, match.start() - 100)
+            end = min(len(text_lower), match.end() + 1500)
+            causal_text = text_lower[start:end]
 
-        # Determine if this section describes causal or non-causal conditions
-        is_causal_section = any(kw in section_lower for kw in causal_keywords)
-        is_excluded_section = any(kw in section_lower for kw in excluded_keywords)
-        is_aggravation = any(kw in section_lower for kw in aggravation_keywords)
+            # Find body parts mentioned in causal context
+            for bp in body_parts:
+                bp_lower = bp.lower()
+                if bp_lower in causal_text:
+                    # Make sure this body part isn't in the exclusion list
+                    normalized_bp = normalize_body_part(bp)
+                    is_excluded = any(e.get("body_part") == normalized_bp for e in result["excluded_body_parts"])
+                    already_causal = any(e.get("body_part") == normalized_bp for e in result["causal_body_parts"])
 
-        # Find which body parts are mentioned in this section
-        for bp in body_parts:
-            if bp.lower() in section_lower:
-                # Extract diagnoses mentioned near this body part
-                diagnoses = extract_diagnoses_for_body_part(section_text, bp)
+                    if not is_excluded and not already_causal:
+                        result["causal_body_parts"].append({
+                            "body_part": normalized_bp,
+                            "classification": "causal",
+                            "diagnoses": [],
+                            "section_context": causal_text[:500]
+                        })
 
-                entry = {
-                    "body_part": normalize_body_part(bp),
-                    "diagnoses": diagnoses,
-                    "section_context": section_text[:500]  # First 500 chars for context
-                }
-
-                if is_aggravation:
-                    entry["classification"] = "aggravation"
-                    entry["pre_existing_notes"] = extract_pre_existing_notes(section_text)
-                    result["aggravations"].append(entry)
-                    # Also add to causal since aggravations qualify for LCP
-                    result["causal_body_parts"].append(entry)
-                elif is_causal_section and not is_excluded_section:
-                    entry["classification"] = "causal"
-                    result["causal_body_parts"].append(entry)
-                elif is_excluded_section:
-                    entry["classification"] = "not_causal"
-                    entry["reason"] = extract_exclusion_reason(section_text, bp)
-                    result["excluded_body_parts"].append(entry)
-
-    # If structured parsing found nothing, mark as low confidence
+    # If we found nothing, mark as low confidence and let AI handle it
     if not result["causal_body_parts"] and not result["excluded_body_parts"]:
         result["parse_confidence"] = "low"
-        # Try a simpler approach - look for summary sections
-        result = fallback_parse(text, result)
 
     # Deduplicate entries
     result["causal_body_parts"] = deduplicate_entries(result["causal_body_parts"])
